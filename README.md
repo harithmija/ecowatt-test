@@ -6,3 +6,4 @@
 
 Simulated readings are generated on first run into `ecowatt.db`. Delete the file to regenerate.
 To use real hardware later, insert rows into `readings` with `source='sensor'`.
+git status

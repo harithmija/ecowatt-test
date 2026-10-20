@@ -3,6 +3,7 @@ import json, os, sqlite3
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
+import re
 
 DB = os.path.join(os.path.dirname(__file__), "ecowatt.db")
 
@@ -143,11 +144,34 @@ def review_action(df, appliance, ts):
     before, after = d[(d.index < t)].tail(7), d[d.index > t]
     return (before.mean() if len(before) else np.nan), (after.mean() if len(after) else np.nan), len(after)
 
+def ev_scenarios(df, tariff=DEFAULT_TARIFF, kwh_per_km=0.16, efficiency=0.90):
+    """What-if: extra monthly kWh and RM from charging an EV at home.
+    kwh_per_km and efficiency are assumptions; check your car's real figures."""
+    last = df.date.max()
+    cur = df[df.date.dt.to_period("M") == last.to_period("M")]
+    month_kwh = cur.kwh.sum() / last.day * last.days_in_month
+    rows = []
+    for km in (20, 40, 60, 80):
+        ev_kwh = km * 30 * kwh_per_km / efficiency
+        rows.append({"km_per_day": km, "extra_kwh_month": round(ev_kwh),
+                     "extra_bill_rm_month": round(bill(month_kwh + ev_kwh, tariff) - bill(month_kwh, tariff), 2)})
+    return {"assumptions": f"{kwh_per_km} kWh/km, {efficiency:.0%} charging efficiency, charged at home every day, "
+                           "no special EV or time-of-use tariff",
+            "current_projected_month_kwh": round(month_kwh), "scenarios": rows}
+
+
+def is_ev_question(q):
+    return bool(re.search(r"\b(ev|tesla|electric (car|vehicle)|charger)\b", q.lower()))
 
 # ---------------- AI advisor ----------------
-SYSTEM = ("You are EcoWatt AI, a home energy advisor. Use ONLY the JSON data supplied; Python already did every calculation. "
-          "Never invent readings. Never diagnose a hardware fault: a high reading is not proof of malfunction, so suggest checks. "
-          "State when data is simulated. Be concise, give specific actions with RM/kWh estimates from the data.")
+SYSTEM = ("You are EcoWatt AI, a home energy advisor. Python has already done every calculation: use the numbers in the "
+          "JSON data and never calculate your own. Household readings are never to be invented. "
+          "For what-if questions (such as an EV charger) use the supplied what_if scenarios, state their assumptions, "
+          "and pick the row closest to what the resident said. If the resident gave a figure that is not covered, "
+          "say which scenario is nearest and ask for their daily driving distance. "
+          "Never diagnose a hardware fault: a high reading is not proof of malfunction. "
+          "Mention that data is simulated and that tariffs are illustrative. For non-energy questions, "
+          "politely say you only help with household energy and electricity costs.")
 
 
 def build_context(df, tariff=DEFAULT_TARIFF):
@@ -161,20 +185,29 @@ def build_context(df, tariff=DEFAULT_TARIFF):
         "previous_month_kwh": round(prev.kwh.sum(), 1),
         "by_appliance_kwh": m.groupby("appliance").kwh.sum().round(1).to_dict(),
         "anomaly_analysis": st.round(2).fillna("n/a").to_dict("records"),
-        "recommendation_library": RECS}, default=str)
+        "recommendation_library": RECS,
+        "what_if_ev_charger": ev_scenarios(df, tariff)}, default=str)
+
 
 
 def ask_gemini(question, context, api_key):
     from google import genai
     client = genai.Client(api_key=api_key)
-    r = client.models.generate_content(model="gemini-2.5-flash",
+    r = client.models.generate_content(model="models/gemini-3.8-flash",
                                        contents=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}")
     return r.text
 
 
-def fallback_answer(df, tariff=DEFAULT_TARIFF):
-    """Rule-based explanation used when no Gemini key is set."""
+def fallback_answer(df, tariff=DEFAULT_TARIFF, question=""):
+    if is_ev_question(question):
+        s = ev_scenarios(df, tariff)
+        lines = "\n".join(f"- {r['km_per_day']} km/day: +{r['extra_kwh_month']} kWh, about +RM {r['extra_bill_rm_month']}/month"
+                          for r in s["scenarios"])
+        return (f"Estimated extra cost of charging an EV at home:\n{lines}\n\nAssumptions: {s['assumptions']}. "
+                "Because the tariff is tiered, extra kWh are billed at your highest tier, so the cost per kWh rises. "
+                "Check your utility for any EV or off-peak tariff, and have an electrician confirm your wiring can support a wall charger.")
     st = appliance_stats(df, tariff).sort_values("extra_month_rm", ascending=False)
+    # ... keep the rest of the old function unchanged
     t = st.iloc[0]
     if t.status in ("normal", "insufficient data"):
         return "No appliance shows a notable change versus its baseline. (Simulated data; rule-based answer, no Gemini key set.)"

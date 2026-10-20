@@ -149,9 +149,9 @@ elif page == "AI advisor":
     if q:
         hist.append(("user", q))
         try:
-            ans = core.ask_gemini(q, ctx, api_key) if api_key else core.fallback_answer(df, tariff)
+           ans = core.ask_gemini(q, ctx, api_key) if api_key else core.fallback_answer(df, tariff, q)
         except Exception as e:
-            ans = core.fallback_answer(df, tariff) + f"\n\n(Gemini unavailable: {e})"
+            ans = core.fallback_answer(df, tariff, q) + f"\n\n(Gemini unavailable: {e})"
         hist.append(("assistant", ans))
         st.rerun()
 

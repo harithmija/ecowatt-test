@@ -1,0 +1,183 @@
+"""EcoWatt AI core: SQLite storage, simulated readings, tariff, analytics, advisor."""
+import json, os, sqlite3
+from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+
+DB = os.path.join(os.path.dirname(__file__), "ecowatt.db")
+
+APPLIANCES = {  # id: (name, rated watts, room)
+    1: ("Air conditioner", 1500, "Bedroom"),
+    2: ("Refrigerator", 150, "Kitchen"),
+    3: ("Water heater", 3000, "Bathroom"),
+    4: ("Washing machine", 500, "Laundry"),
+}
+
+# ILLUSTRATIVE tiered tariff (RM/kWh). Edit in the app to match your own bill.
+DEFAULT_TARIFF = [(200, 0.270), (300, 0.370), (600, 0.516), (900, 0.546), (float("inf"), 0.571)]
+GRID_KG_PER_KWH = 0.70  # placeholder emission factor; replace with an official value
+
+RECS = {
+    "Air conditioner": "Check operating hours and thermostat setpoint, clean the filters, and look for open doors or windows.",
+    "Refrigerator": "Check the door seal, avoid placing hot food inside, and leave space around the coils.",
+    "Water heater": "Shorten heating periods, lower the thermostat and check for dripping hot taps.",
+    "Washing machine": "Use full loads and cold-water cycles where possible.",
+}
+
+
+def conn():
+    return sqlite3.connect(DB)
+
+
+def init_db():
+    with conn() as c:
+        c.executescript("""
+        CREATE TABLE IF NOT EXISTS appliances(id INTEGER PRIMARY KEY, name TEXT, rated_w REAL, room TEXT);
+        CREATE TABLE IF NOT EXISTS readings(appliance_id INTEGER, ts TEXT, kwh REAL, power_w REAL, source TEXT);
+        CREATE INDEX IF NOT EXISTS ix_r ON readings(appliance_id, ts);
+        CREATE TABLE IF NOT EXISTS actions(id INTEGER PRIMARY KEY AUTOINCREMENT, appliance TEXT, ts TEXT, note TEXT);
+        """)
+        for i, (n, w, r) in APPLIANCES.items():
+            c.execute("INSERT OR IGNORE INTO appliances VALUES(?,?,?,?)", (i, n, w, r))
+        if c.execute("SELECT COUNT(*) FROM readings").fetchone()[0] == 0:
+            simulate(c)
+
+
+def simulate(c, days=75, seed=7):
+    """Hourly simulated readings. The AC drifts upward in the last 7 days so the demo has an anomaly.
+    To use real sensors later, insert rows into `readings` with source='sensor'."""
+    rng = np.random.default_rng(seed)
+    end = datetime.now().replace(minute=0, second=0, microsecond=0)
+    drift = end - timedelta(days=7)
+    rows = []
+    for ts in pd.date_range(end - timedelta(days=days), end, freq="h"):
+        h, wd = ts.hour, ts.weekday()
+        ac = rng.uniform(0.55, 0.85) if (h >= 21 or h < 7) else (rng.uniform(0.4, 0.7) if wd >= 5 and 13 <= h < 17 else 0)
+        if ts >= drift:
+            ac = ac * 1.15 + (rng.uniform(0.5, 0.9) if 12 <= h < 18 else 0)
+        fr = max(0, rng.normal(0.055, 0.006))
+        wh = rng.uniform(0.5, 1.1) if h in (6, 7, 19, 20) else 0
+        wm = rng.uniform(0.35, 0.7) if (wd in (1, 3, 5) and h in (19, 20)) else 0
+        for i, v in zip((1, 2, 3, 4), (ac, fr, wh, wm)):
+            rows.append((i, ts.isoformat(), round(v, 4), round(v * 1000, 1), "simulated"))
+    c.executemany("INSERT INTO readings VALUES(?,?,?,?,?)", rows)
+
+
+def load_readings():
+    with conn() as c:
+        df = pd.read_sql("SELECT r.ts, r.kwh, r.power_w, r.source, a.name appliance FROM readings r "
+                         "JOIN appliances a ON a.id=r.appliance_id", c, parse_dates=["ts"])
+    df["date"] = df.ts.dt.normalize()
+    df["hour"] = df.ts.dt.hour
+    return df
+
+
+def bill(kwh, tariff=DEFAULT_TARIFF):
+    total, prev = 0.0, 0.0
+    for cap, rate in tariff:
+        if kwh > prev:
+            total += (min(kwh, cap) - prev) * rate
+        prev = cap
+    return total
+
+
+def tier_rows(kwh, tariff=DEFAULT_TARIFF):
+    rows, prev = [], 0.0
+    for cap, rate in tariff:
+        used = max(0.0, min(kwh, cap) - prev)
+        label = f"{prev:.0f}+ kWh" if cap == float("inf") else f"{prev:.0f}-{cap:.0f} kWh"
+        rows.append({"Tier": label, "kWh used": round(used, 1), "Rate (RM/kWh)": rate, "Cost (RM)": round(used * rate, 2)})
+        prev = cap
+    return pd.DataFrame(rows)
+
+
+def saving_rm(month_kwh, saved_kwh, tariff=DEFAULT_TARIFF):
+    return bill(month_kwh, tariff) - bill(max(0, month_kwh - saved_kwh), tariff)
+
+
+def appliance_stats(df, tariff=DEFAULT_TARIFF):
+    """Compare the last 7 full days with the earlier baseline.
+    high = recent average >15% above baseline; abnormal = >25% above AND at least 3 days beyond baseline+2sd."""
+    daily = df.groupby(["appliance", "date"]).kwh.sum().reset_index()
+    last = daily.date.max()
+    month_kwh = df[df.date.dt.to_period("M") == last.to_period("M")].kwh.sum()
+    out = []
+    for name, g in daily.groupby("appliance"):
+        g = g[g.date < last].sort_values("date")
+        recent, base = g.tail(7), g.iloc[:-7]
+        if len(base) < 14:
+            out.append(dict(appliance=name, status="insufficient data", baseline=np.nan, recent=recent.kwh.mean(),
+                            pct=np.nan, days_over=0, extra_month_kwh=0, extra_month_rm=0,
+                            why="Fewer than 14 baseline days, so no conclusion can be drawn."))
+            continue
+        bm, sd = base.kwh.mean(), max(base.kwh.std(), 1e-6)
+        rm = recent.kwh.mean()
+        pct = rm / bm - 1
+        over = int((recent.kwh > bm + 2 * sd).sum())
+        status = "abnormal" if (pct > .25 and over >= 3) else "high" if pct > .15 else "normal"
+        extra = max(0, rm - bm) * 30
+        why = (f"Last 7 days average {rm:.2f} kWh/day against a baseline of {bm:.2f} kWh/day ({pct:+.0%}). "
+               f"{over} of 7 days exceeded baseline + 2 standard deviations ({bm + 2*sd:.2f} kWh). ")
+        why += {"abnormal": "The rise is sustained, so it is flagged as abnormal. This does not prove a fault; check usage conditions first.",
+                "high": "Usage is elevated but not consistently outside normal variation, so it is flagged as high only.",
+                "normal": "Within normal variation."}[status]
+        out.append(dict(appliance=name, status=status, baseline=bm, recent=rm, pct=pct, days_over=over,
+                        extra_month_kwh=extra, extra_month_rm=saving_rm(month_kwh + extra, extra, tariff) if extra else 0, why=why))
+    return pd.DataFrame(out)
+
+
+def add_action(appliance, note):
+    with conn() as c:
+        c.execute("INSERT INTO actions(appliance, ts, note) VALUES(?,?,?)", (appliance, datetime.now().isoformat(timespec="minutes"), note))
+
+
+def load_actions():
+    with conn() as c:
+        return pd.read_sql("SELECT * FROM actions ORDER BY ts DESC", c)
+
+
+def review_action(df, appliance, ts):
+    """Average daily kWh for 7 days before vs. days since the action."""
+    t = pd.Timestamp(ts).normalize()
+    d = df[df.appliance == appliance].groupby("date").kwh.sum()
+    before, after = d[(d.index < t)].tail(7), d[d.index > t]
+    return (before.mean() if len(before) else np.nan), (after.mean() if len(after) else np.nan), len(after)
+
+
+# ---------------- AI advisor ----------------
+SYSTEM = ("You are EcoWatt AI, a home energy advisor. Use ONLY the JSON data supplied; Python already did every calculation. "
+          "Never invent readings. Never diagnose a hardware fault: a high reading is not proof of malfunction, so suggest checks. "
+          "State when data is simulated. Be concise, give specific actions with RM/kWh estimates from the data.")
+
+
+def build_context(df, tariff=DEFAULT_TARIFF):
+    st = appliance_stats(df, tariff)
+    last = df.date.max()
+    m = df[df.date.dt.to_period("M") == last.to_period("M")]
+    prev = df[df.date.dt.to_period("M") == (last.to_period("M") - 1)]
+    return json.dumps({
+        "data_source": "simulated" if (df.source == "simulated").all() else "mixed/sensor",
+        "month_to_date_kwh": round(m.kwh.sum(), 1), "month_to_date_bill_rm": round(bill(m.kwh.sum(), tariff), 2),
+        "previous_month_kwh": round(prev.kwh.sum(), 1),
+        "by_appliance_kwh": m.groupby("appliance").kwh.sum().round(1).to_dict(),
+        "anomaly_analysis": st.round(2).fillna("n/a").to_dict("records"),
+        "recommendation_library": RECS}, default=str)
+
+
+def ask_gemini(question, context, api_key):
+    from google import genai
+    client = genai.Client(api_key=api_key)
+    r = client.models.generate_content(model="gemini-2.5-flash",
+                                       contents=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}")
+    return r.text
+
+
+def fallback_answer(df, tariff=DEFAULT_TARIFF):
+    """Rule-based explanation used when no Gemini key is set."""
+    st = appliance_stats(df, tariff).sort_values("extra_month_rm", ascending=False)
+    t = st.iloc[0]
+    if t.status in ("normal", "insufficient data"):
+        return "No appliance shows a notable change versus its baseline. (Simulated data; rule-based answer, no Gemini key set.)"
+    return (f"Investigate the **{t.appliance}** first. {t.why}\n\nIf this continues it could add about "
+            f"{t.extra_month_kwh:.0f} kWh (RM {t.extra_month_rm:.2f}) per month. Suggested checks: {RECS[t.appliance]}\n\n"
+            "_Simulated data; rule-based answer because no Gemini key is set._")

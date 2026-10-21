@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EcoWatt AI</title><link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+:root{--g:#0B4F3C;--g2:#3E9B73;--g3:#9BD3B5;--bg:#F5FAF7;--line:#D5E5DC;--ink:#14261F;--mute:#5B7168;--red:#B3261E;--amb:#B8901A}
+*{box-sizing:border-box}body{margin:0;font-family:'Instrument Sans',sans-serif;color:var(--ink);background:var(--bg);display:flex;min-height:100vh}
+aside{width:248px;background:var(--g);color:#E8F3EC;padding:20px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;flex-shrink:0}
+aside img{width:170px;margin:0 8px 24px}aside h6{margin:18px 12px 6px;font-size:.75rem;font-weight:600;color:var(--g3)}
+aside a{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;color:#E8F3EC;text-decoration:none;font-weight:500;margin:2px 0}
+aside a:hover{background:rgba(255,255,255,.1)}aside a.on{background:#fff;color:var(--g);font-weight:700}aside svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.foot{margin-top:auto;font-size:.78rem;padding:0 12px;color:var(--g3)}
+main{flex:1;padding:28px 36px;min-width:0;max-width:1280px}
+h1{font-size:1.9rem;margin:0 0 4px;color:var(--g);letter-spacing:-.02em}h2{font-size:1.1rem;color:var(--g);margin:28px 0 10px}.sub{color:var(--mute);margin:0 0 20px}
+.grid{display:grid;gap:14px}.k4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.c2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px}.card .l{color:var(--mute);font-size:.85rem}.card .v{font-size:1.7rem;font-weight:700;color:var(--g);margin-top:2px}.card .d{font-size:.82rem;color:var(--mute)}
+.hero{background:var(--g);color:#fff;border-radius:12px;padding:26px 28px;margin-bottom:16px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+.hero b{font-size:2.4rem;letter-spacing:-.02em;display:block}.hero span{color:var(--g3)}.bar{height:8px;background:rgba(255,255,255,.2);border-radius:4px;margin-top:10px;width:280px;max-width:100%}.bar i{display:block;height:100%;background:var(--g3);border-radius:4px}
+.btn{background:var(--g);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}.btn:hover{background:#09402F}.btn.alt{background:#fff;color:var(--g);border:1px solid var(--line)}
+.alert{border-left:4px solid;background:#fff;padding:12px 16px;margin:8px 0;border-radius:0 8px 8px 0;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.78rem;font-weight:700;color:#fff}
+.abnormal{background:var(--red)}.high{background:var(--amb)}.normal{background:var(--g2)}.insufficient{background:#888}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.9rem}th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}th{background:#EAF4EE;color:var(--g)}
+.scroll{overflow-x:auto;max-height:420px;overflow-y:auto}select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.chat{max-width:760px}.msgs{display:flex;flex-direction:column;gap:10px;min-height:240px;margin-bottom:12px}.m{padding:10px 14px;border-radius:12px;max-width:85%;line-height:1.5}.m.u{align-self:flex-end;background:var(--g);color:#fff}.m.a{background:#fff;border:1px solid var(--line)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.chip{border:1px solid var(--g3);background:#fff;color:var(--g);padding:6px 12px;border-radius:99px;cursor:pointer;font:inherit;font-size:.85rem}.chip:hover{background:#EAF4EE}
+.row{display:flex;gap:8px}.row input{flex:1}.sl{margin:12px 0}.sl label{display:flex;justify-content:space-between;font-weight:600}input[type=range]{width:100%;accent-color:var(--g)}
+.big{font-size:1.6rem;font-weight:600;color:var(--g);line-height:1.4;max-width:46rem;margin:0 0 6px}
+@media(max-width:820px){body{flex-direction:column}aside{width:100%;height:auto;position:sticky;z-index:5;flex-direction:row;overflow-x:auto;padding:8px;gap:4px;align-items:center}aside img,aside h6,.foot{display:none}aside a{white-space:nowrap}main{padding:18px 14px}}
+</style></head><body>
+<aside><img src="/static/logo.svg" alt="EcoWatt AI"><h6>Monitor</h6><div id="n1"></div><h6>Decide</h6><div id="n2"></div><div class="foot" id="src"></div></aside>
+<main id="view"></main>
+<script>
+const $=s=>document.querySelector(s),api=(u,o)=>fetch(u,o).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});
+const fmt=(n,d=0)=>n==null?'-':Number(n).toLocaleString('en-MY',{minimumFractionDigits:d,maximumFractionDigits:d}),rm=n=>'RM '+fmt(n,2);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+const PAL=['#0B4F3C','#3E9B73','#9BD3B5','#C9A227'],COL={abnormal:'#B3261E',high:'#B8901A'};
+const IC={dash:'<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',plug:'<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a6 6 0 0 1-12 0V8z"/>',bot:'<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4M8 14h.01M16 14h.01"/>',sav:'<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2zM2 9v1"/>',eco:'<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10zM2 21c0-3 1.9-5.5 6-7"/>'};
+const ROUTES=[['overview','Overview','dash',1],['monthly','Monthly report','cal',1],['appliances','Appliances','plug',1],['advisor','AI advisor','bot',2],['simulator','Savings simulator','sav',2],['sustainability','Sustainability','eco',2]];
+ROUTES.forEach(([id,t,ic,g])=>$('#n'+g).insertAdjacentHTML('beforeend',`<a href="#/${id}" data-r="${id}"><svg viewBox="0 0 24 24">${IC[ic]}</svg>${t}</a>`));
+const L=(x={})=>({margin:{l:44,r:10,t:10,b:36},font:{family:'Instrument Sans'},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',legend:{orientation:'h',y:-.2},...x});
+const plot=(id,d,x)=>Plotly.newPlot(id,d,L(x),{displayModeBar:false,responsive:true});
+const kpi=(l,v,d='')=>`<div class="card"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+const stack=(dates,s,type='bar')=>Object.keys(s).map((k,i)=>({x:dates,y:s[k],name:k,type,marker:{color:PAL[i%4]},...(type=='scatter'?{stackgroup:'a',line:{width:0},fillcolor:PAL[i%4]}:{})}));
+const V=h=>$('#view').innerHTML=h;
+
+const pages={
+async overview(){const o=await api('/api/overview');$('#src').textContent=o.simulated?'Readings are simulated':'Live sensor data';
+ V(`<h1>Overview</h1><p class="sub">${o.month}, day ${o.day} of ${o.days}</p>
+ <div class="hero"><div><span>Estimated bill so far</span><b>${rm(o.bill)}</b><span>${fmt(o.kwh)} kWh used</span><div class="bar"><i style="width:${o.day/o.days*100}%"></i></div></div>
+ <div><span>Projected month-end</span><b>${rm(o.proj_bill)}</b><span>${fmt(o.proj_kwh)} kWh at the current pace</span></div></div>
+ <div class="grid k4">${kpi('Potential savings',rm(o.savings)+'/mo','if flagged issues are fixed')}${kpi('Alerts',o.alerts.length,o.alerts.length?'need attention':'all normal')}${kpi('Top appliance',Object.entries(o.by_appliance).sort((a,b)=>b[1]-a[1])[0][0],'this month')}</div>
+ <div class="grid c2"><div><h2>Where the energy goes</h2><div class="card"><div id="p1"></div></div></div><div><h2>Last 30 days</h2><div class="card"><div id="p2"></div></div></div></div>
+ <h2>Alerts and next steps</h2>${o.alerts.length?o.alerts.map(a=>`<div class="alert" style="border-left-color:${COL[a.status]}"><b>${a.appliance}</b> <span class="pill ${a.status}">${a.status}</span><p>${esc(a.why)}</p><p><b>Next:</b> ${esc(a.rec)} Possible saving: <b>${rm(a.rm)}</b>/month.</p><button class="btn alt" onclick="ask('Why is my ${a.appliance.toLowerCase()} flagged and what should I do?')">Ask the advisor</button></div>`).join(''):'<div class="card">No unusual consumption detected.</div>'}`);
+ plot('p1',[{type:'pie',hole:.55,labels:Object.keys(o.by_appliance),values:Object.values(o.by_appliance),marker:{colors:PAL},textinfo:'percent'}],{height:300});
+ plot('p2',stack(o.trend.dates,o.trend.series,'scatter'),{height:300,yaxis:{title:'kWh'}})},
+
+async monthly(){const ms=await api('/api/months');V(`<h1>Monthly electricity report</h1><p class="sub">Choose a month to see the full picture.</p><select id="ms">${ms.map(m=>`<option>${m}</option>`).join('')}</select><div id="mb"></div>`);
+ const load=async()=>{const m=$('#ms').value,d=await api('/api/monthly?month='+m);
+ $('#mb').innerHTML=`<div class="grid k4" style="margin-top:14px">${kpi('Total',fmt(d.total,1)+' kWh',d.partial?d.days_recorded+' days so far':'')}${kpi('Estimated bill',rm(d.bill))}${kpi('Daily average',fmt(d.avg,1)+' kWh')}${kpi('Peak day',d.peak_day.slice(5),fmt(d.peak_kwh,1)+' kWh')}${kpi('Top appliance',d.top)}</div>
+ <h2>Daily consumption by appliance</h2><div class="card"><div id="m1"></div></div>
+ <div class="grid c2"><div><h2>Cumulative bill (RM)</h2><div class="card"><div id="m2"></div></div></div><div><h2>When power is used</h2><div class="card"><div id="m3"></div></div></div></div>
+ <h2>What your bill is made of</h2><table><tr><th>Charge</th><th>Amount (RM)</th></tr>${d.breakdown.map(r=>`<tr><td>${r.Charge}</td><td>${fmt(r['Amount (RM)'],2)}</td></tr>`).join('')}</table><p class="sub">Estimate based on the TNB domestic tariff. Your actual bill may differ.</p>
+ <h2>Daily table</h2><button class="btn alt" id="csv">Download CSV</button><div class="scroll" style="margin-top:8px"><table><tr><th>Date</th>${Object.keys(d.series).map(k=>`<th>${k}</th>`).join('')}<th>Total kWh</th></tr>${d.table.map(r=>`<tr><td>${r.date}</td>${Object.keys(d.series).map(k=>`<td>${r[k]}</td>`).join('')}<td><b>${r.total}</b></td></tr>`).join('')}</table></div>`;
+ plot('m1',stack(d.dates,d.series),{barmode:'stack',height:320,yaxis:{title:'kWh'}});plot('m2',[{x:d.dates,y:d.cum_rm,type:'scatter',fill:'tozeroy',line:{color:'#0B4F3C'},fillcolor:'rgba(155,211,181,.4)'}],{height:300});
+ plot('m3',[{type:'heatmap',x:d.heat.x,y:d.heat.y,z:d.heat.z,colorscale:'Greens',colorbar:{title:'kWh'}}],{height:300,yaxis:{title:'Hour'}});
+ $('#csv').onclick=()=>{const k=Object.keys(d.series),t=['date,'+k.join(',')+',total',...d.table.map(r=>[r.date,...k.map(c=>r[c]),r.total].join(','))].join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download=`ecowatt_${m}.csv`;a.click()}};
+ $('#ms').onchange=load;load()},
+
+async appliances(){const [A,acts]=await Promise.all([api('/api/appliances'),api('/api/actions')]);
+ V(`<h1>Appliance monitoring</h1><p class="sub">Each appliance is compared with its own baseline.</p><div class="grid c2">${A.map((a,i)=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:1.1rem">${a.name}</b><div class="d">${a.room}, rated ${a.rated_w} W</div></div><span class="pill ${a.status.split(' ')[0]}">${a.status}</span></div>
+ <div class="grid" style="grid-template-columns:repeat(3,1fr);margin:12px 0"><div><div class="d">Latest power</div><b>${fmt(a.power_w)} W</b></div><div><div class="d">This month</div><b>${fmt(a.month_kwh,1)} kWh</b></div><div><div class="d">Last 7 days</div><b>${fmt(a.recent,2)}</b> kWh/day ${a.pct!=null?`<span style="color:${a.pct>.15?'#B3261E':'#3E9B73'}">${a.pct>0?'+':''}${fmt(a.pct*100)}%</span>`:''}</div></div>
+ <div id="a${i}"></div><p>${esc(a.why)}</p>${a.status=='abnormal'||a.status=='high'?`<p><b>Suggested checks:</b> ${esc(a.rec)}<br><b>Possible saving:</b> ${rm(a.extra_rm)}/month</p>`:''}
+ <div class="row"><input type="text" id="n${i}" placeholder="Record an action, e.g. cleaned the filter"><button class="btn" onclick="act(${i},'${a.name}')">Save</button></div></div>`).join('')}</div>
+ <h2>Action log and review</h2>${acts.length?acts.map(x=>`<div class="card" style="margin-bottom:8px"><b>${x.ts.replace('T',' ')}</b> ${x.appliance}: ${esc(x.note)}<div class="d">${x.days_after?`Average ${fmt(x.before,2)} to ${fmt(x.after,2)} kWh/day over ${x.days_after} day(s)`:`Baseline ${fmt(x.before,2)} kWh/day; no readings after the action yet`}</div></div>`).join(''):'<div class="card">Actions you record appear here with a before and after comparison.</div>'}`);
+ A.forEach((a,i)=>plot('a'+i,[{x:a.dates,y:a.kwh,type:'bar',marker:{color:'#0B4F3C'},name:'kWh'}],{height:200,showlegend:false,shapes:a.baseline!=null?[{type:'line',xref:'paper',x0:0,x1:1,y0:a.baseline,y1:a.baseline,line:{dash:'dash',color:'#B8901A'}}]:[]}))},
+
+advisor(){V(`<div class="chat"><h1>AI energy advisor</h1><p class="sub">Python does the calculations. The AI explains them.</p><div class="chips">${['My electricity usage increased this month. Which appliance should I investigate first?','I want to add an EV charger for my Tesla. How much would that increase my bill?','How can I lower my bill by RM 30?'].map(q=>`<button class="chip" onclick="ask(this.textContent,1)">${q}</button>`).join('')}</div><div class="msgs" id="msgs"></div><div class="row"><input type="text" id="q" placeholder="Ask about your bill, an appliance or a new purchase"><button class="btn" onclick="ask()">Send</button></div></div>`);
+ $('#q').onkeydown=e=>{if(e.key=='Enter')ask()};(window.hist||[]).forEach(([r,t])=>bub(r,t))},
+
+async simulator(){V(`<h1>Savings simulator</h1><p class="sub">Try changes and see the effect on your monthly bill.</p><div class="grid c2"><div class="card">
+ ${[['hours','Cut AC running hours per day',0,4,.5,1,' h'],['setpoint','Raise AC setpoint',0,4,1,1,' C'],['heater','Shorten water-heater use',0,50,5,20,'%']].map(([id,l,a,b,s,v,u])=>`<div class="sl"><label>${l}<span id="${id}v">${v}${u}</span></label><input type="range" id="${id}" min="${a}" max="${b}" step="${s}" value="${v}" data-u="${u}"></div>`).join('')}<p class="d">Assumes about 6% less AC energy per 1 C higher setpoint, based on your last 7 days.</p></div>
+ <div class="card"><div class="l">Estimated saving</div><div class="v" id="tot"></div><div class="d" id="totk"></div><div id="s2"></div></div></div><h2>Ranked by saving</h2><div class="card"><div id="s1"></div></div>`);
+ let t;const run=async()=>{const q=['hours','setpoint','heater'].map(i=>{const e=$('#'+i);$('#'+i+'v').textContent=e.value+e.dataset.u;return i+'='+e.value}).join('&'),d=await api('/api/simulate?'+q);
+ $('#tot').textContent=rm(d.total_rm)+'/month';$('#totk').textContent=fmt(d.total_kwh)+' kWh less each month';const it=[...d.items].sort((a,b)=>a.rm-b.rm);
+ plot('s1',[{type:'bar',orientation:'h',x:it.map(i=>i.rm),y:it.map(i=>i.action),marker:{color:'#0B4F3C'}}],{height:220,xaxis:{title:'RM per month'},margin:{l:150,r:10,t:10,b:40}});
+ plot('s2',[{type:'bar',x:['Current pace','With changes'],y:[d.bill_now,d.bill_after],marker:{color:['#9BD3B5','#0B4F3C']}}],{height:220,yaxis:{title:'Projected bill (RM)'}})};
+ document.querySelectorAll('input[type=range]').forEach(e=>e.oninput=()=>{clearTimeout(t);t=setTimeout(run,150)});run()},
+
+async sustainability(){const s=await api('/api/sustainability');V(`<h1>Your impact on the planet</h1><p class="big">By the end of this month your home will have caused about ${fmt(s.kg)} kg of CO2, like driving a petrol car around ${fmt(s.km)} km.</p><p class="sub">Most of Malaysia's electricity still comes from burning fuel, which releases CO2. Using less power means less CO2.</p>
+ <div class="grid k4">${kpi('Compared with last month',(s.change>0?'+':'')+fmt((s.change||0)*100)+'%',s.change>0?'Higher than last month':'Lower than last month')}${kpi('Trees to absorb it',fmt(s.trees),'growing for one year')}${kpi('Car distance equivalent',fmt(s.km)+' km','in a petrol car')}</div>
+ <h2>Easy ways to cut it</h2>${s.wins.length?s.wins.map(w=>`<div class="alert" style="border-left-color:#3E9B73"><b>${w.appliance}</b>: ${esc(w.rec)}<br>Could save about <b>${rm(w.rm)}</b> and <b>${fmt(w.kg)} kg of CO2</b> each month.</div>`).join(''):'<div class="card">Nothing is using unusual energy right now. Keep it up.</div>'}
+ <h2>Month by month</h2><div class="card"><div id="e1"></div></div><p class="sub">The oldest and newest months may be partial.</p>
+ <details class="card"><summary><b>How we work this out</b></summary><p>CO2 = kWh used x ${s.ef} kg per kWh, an estimate of the CO2 the grid releases per unit. A petrol car emits roughly 0.17 kg per km and a tree absorbs roughly 21 kg a year. These are rounded everyday figures, not exact measurements.</p></details>`);
+ plot('e1',[{type:'bar',x:s.months,y:s.month_kg,marker:{color:'#0B4F3C'}}],{height:260,yaxis:{title:'kg of CO2'}})}};
+
+window.hist=window.hist||[];
+function bub(r,t){const m=$('#msgs');if(!m)return;m.insertAdjacentHTML('beforeend',`<div class="m ${r=='u'?'u':'a'}">${md(t)}</div>`);m.scrollTop=m.scrollHeight}
+async function ask(q,stay){if(!q){q=($('#q')||{}).value;if(!q||!q.trim())return}if(!$('#msgs')){location.hash='#/advisor';await new Promise(r=>setTimeout(r,250))}
+ const inp=$('#q');if(inp)inp.value='';hist.push(['u',q]);bub('u',q);bub('a','Thinking...');
+ try{const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});hist.push(['a',r.answer]);$('#msgs').lastChild.innerHTML=md(r.answer)}catch(e){$('#msgs').lastChild.textContent='Sorry, the advisor is unavailable. Please try again.'}}
+async function act(i,name){const el=$('#n'+i);if(!el.value.trim())return;await api('/api/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appliance:name,note:el.value})});route()}
+async function route(){const id=(location.hash.replace('#/','')||'overview');const p=pages[id]||pages.overview;document.querySelectorAll('aside a').forEach(a=>a.classList.toggle('on',a.dataset.r==id));
+ try{await p();window.scrollTo(0,0)}catch(e){V('<div class="card">Could not load this page. Is the server running?</div>')}}
+addEventListener('hashchange',route);route();
+</script></body></html>

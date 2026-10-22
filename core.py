@@ -191,9 +191,13 @@ def build_context(df, tariff=DEFAULT_TARIFF):
 def ask_gemini(question, context, api_key):
     from google import genai
     client = genai.Client(api_key=api_key)
-    r = client.models.generate_content(model="gemini-3.8-flash",
-                                       contents=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}")
-    return r.text
+    r = client.interactions.create(
+        model="gemini-3.8-flash",
+        input=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}",
+    )
+    if not r.output_text:
+        raise RuntimeError("Gemini returned no text response.")
+    return r.output_text
 
 
 def fallback_answer(df, tariff=None, question=""):

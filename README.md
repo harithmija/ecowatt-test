@@ -17,5 +17,12 @@ The client ID is public configuration, not a password. Google sign-in is hidden 
 
 For a deployment over HTTPS, set `$env:COOKIE_SECURE = "1"` before starting Uvicorn. Do not expose this demo publicly without adding appropriate rate limiting and separate storage/access controls for real household data.
 
+The dashboard includes the Eco Score overview, detailed/simple view toggle, interactive home map, appliance action log, budget and challenges, shareable weekly recap, bill explainer, hourly scheduler, month comparison, device readings, dark mode, and energy tips. To enable sensor reading ingestion, set a private token in the same PowerShell window before starting Uvicorn:
+
+    $env:INGEST_TOKEN = Read-Host "Enter a private sensor-ingestion token"
+
+The token is required for `POST /api/readings`; sensor clients must send it in the `X-Token` header. The resident must also be signed in.
+
 Simulated readings are generated on first run into `ecowatt.db`. All resident accounts currently see the same simulated household data. Delete the database file to regenerate readings; this also deletes accounts, sessions, and saved actions.
+
 To use real hardware later, insert rows into `readings` with `source='sensor'`.

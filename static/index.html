@@ -34,6 +34,20 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .pulse-dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: pulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1); }
         @keyframes pulse { to { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
+        .confetti-piece { position: fixed; top: -16px; z-index: 60; width: 9px; height: 14px; pointer-events: none; animation: confetti-fall 2.8s ease-in forwards; }
+        @keyframes confetti-fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0.8; } }
+        [data-theme="dark"] body, [data-theme="dark"] main { background-color: #0f1a15 !important; color: #e4f0ea !important; }
+        [data-theme="dark"] header, [data-theme="dark"] .bg-white { background-color: #16241e !important; color: #e4f0ea !important; }
+        [data-theme="dark"] .text-slate-800, [data-theme="dark"] .text-slate-700,
+        [data-theme="dark"] .text-slate-600 { color: #e4f0ea !important; }
+        [data-theme="dark"] .text-slate-500, [data-theme="dark"] .text-slate-400 { color: #93ab9f !important; }
+        [data-theme="dark"] .bg-slate-50, [data-theme="dark"] .bg-slate-100 { background-color: #1d332a !important; }
+        [data-theme="dark"] .border-slate-100, [data-theme="dark"] .border-slate-200,
+        [data-theme="dark"] .border-slate-300 { border-color: #264035 !important; }
+        [data-theme="dark"] input, [data-theme="dark"] select { background-color: #16241e !important; color: #e4f0ea !important; border-color: #3e5d4f !important; }
+        [data-theme="dark"] .glass-panel { background: rgba(22,36,30,.94) !important; border-color: #264035 !important; }
+        [data-theme="dark"] .apexcharts-text { fill: #dce9e2 !important; }
+        [data-theme="dark"] .apexcharts-legend-text { color: #dce9e2 !important; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -41,6 +55,15 @@
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-slate-800">
+
+    <div id="api-error-banner" class="fixed right-4 top-4 z-[70] hidden max-w-md rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-lg" role="alert">
+        <div class="flex items-start gap-3">
+            <i class="ph-fill ph-warning-circle mt-0.5 text-lg"></i>
+            <div id="api-error-message" class="flex-1"></div>
+            <button type="button" onclick="location.reload()" class="font-semibold underline">Retry</button>
+            <button type="button" aria-label="Dismiss error" onclick="document.getElementById('api-error-banner').classList.add('hidden')" class="px-1 text-lg leading-none">&times;</button>
+        </div>
+    </div>
 
     <!-- Sidebar -->
     <aside class="w-64 bg-brand-900 text-white flex flex-col h-full z-20 flex-shrink-0 transition-all duration-300 shadow-xl relative" id="sidebar">
@@ -54,23 +77,51 @@
         
         <div class="px-6 py-4 mt-4 flex-1 space-y-1 overflow-y-auto">
             <div class="text-xs font-semibold text-brand-100 opacity-60 uppercase tracking-wider mb-2 mt-4">Menu</div>
-            <div class="nav-item active flex items-center gap-3 px-4 py-3" onclick="switchTab('overview')">
+            <div class="nav-item active flex items-center gap-3 px-4 py-3" onclick="switchTab('overview', this)">
                 <i class="ph ph-squares-four text-lg"></i> <span class="font-medium">Overview</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('monthly')">
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('monthly', this)">
                 <i class="ph ph-chart-bar text-lg"></i> <span class="font-medium">Monthly Report</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('appliances')">
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('map', this)">
+                <i class="ph ph-house-line text-lg"></i> <span class="font-medium">Home Map</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('appliances', this)">
                 <i class="ph ph-plug text-lg"></i> <span class="font-medium">Appliances</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('advisor')">
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('advisor', this)">
                 <i class="ph ph-magic-wand text-lg"></i> <span class="font-medium">AI Advisor</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('simulator')">
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('simulator', this)">
                 <i class="ph ph-sliders-horizontal text-lg"></i> <span class="font-medium">Savings Simulator</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('sustainability')">
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('sustainability', this)">
                 <i class="ph ph-tree text-lg"></i> <span class="font-medium">Sustainability</span>
+            </div>
+            <div class="mt-5 border-t border-white/15 pt-4 text-xs font-semibold uppercase tracking-wider text-brand-100 opacity-60">Plan & Explore</div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('budget', this)">
+                <i class="ph ph-target text-lg"></i> <span class="font-medium">Budget & Goals</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('challenges', this)">
+                <i class="ph ph-trophy text-lg"></i> <span class="font-medium">Challenges</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('recap', this)">
+                <i class="ph ph-gift text-lg"></i> <span class="font-medium">Weekly Recap</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('bill', this)">
+                <i class="ph ph-receipt text-lg"></i> <span class="font-medium">Bill Explainer</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('scheduler', this)">
+                <i class="ph ph-clock text-lg"></i> <span class="font-medium">Smart Scheduler</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('compare', this)">
+                <i class="ph ph-git-compare text-lg"></i> <span class="font-medium">Compare</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('devices', this)">
+                <i class="ph ph-cpu text-lg"></i> <span class="font-medium">Devices</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('learn', this)">
+                <i class="ph ph-book-open text-lg"></i> <span class="font-medium">Learn</span>
             </div>
         </div>
 
@@ -104,6 +155,7 @@
                     <div id="user-name" class="hidden text-sm font-semibold text-slate-700 sm:block"></div>
                     <button type="button" onclick="signOut()" class="text-xs text-slate-500 hover:text-rose-600">Sign out</button>
                 </div>
+                <button id="theme-toggle" type="button" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" aria-label="Toggle color theme">Dark mode</button>
                 <div id="user-avatar" class="h-10 w-10 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-bold border-2 border-white shadow-sm" aria-hidden="true">
                     EW
                 </div>
@@ -115,6 +167,7 @@
             
             <!-- OVERVIEW VIEW -->
             <div id="view-overview" class="view-section active space-y-6">
+                <div id="eco-home-card"></div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col justify-between">
                         <div class="flex justify-between items-start">
@@ -157,7 +210,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div id="overview-details" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 lg:col-span-2">
                         <h3 class="text-lg font-bold text-slate-800 mb-4">Last 30 Days Trend</h3>
                         <div id="chart-area" class="w-full h-[300px]"></div>
@@ -200,6 +253,11 @@
                 </div>
             </div>
 
+            <div id="view-map" class="view-section space-y-6">
+                <p class="text-slate-500">Explore appliance status and recent power use by room.</p>
+                <div id="map-content" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
+            </div>
+
             <!-- APPLIANCES VIEW -->
             <div id="view-appliances" class="view-section space-y-6">
                 <p class="text-slate-500 mb-4">Detailed monitoring and anomaly detection for registered appliances.</p>
@@ -219,6 +277,11 @@
                             <h3 class="font-bold text-brand-900">EcoWatt AI Assistant</h3>
                             <p class="text-xs text-brand-600 font-medium">Powered by Gemini & Python Analytics</p>
                         </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
+                        <button type="button" class="advisor-prompt rounded-full border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-900 hover:bg-brand-50">Which appliance should I check first?</button>
+                        <button type="button" class="advisor-prompt rounded-full border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-900 hover:bg-brand-50">How can I lower my bill by RM 30?</button>
+                        <button type="button" class="advisor-prompt rounded-full border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-900 hover:bg-brand-50">What if I charge an EV at home?</button>
                     </div>
                     <div class="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" id="chat-box">
                         <div class="flex gap-4 max-w-[80%]">
@@ -299,10 +362,40 @@
                         <h3 class="text-4xl font-black mt-1"><span id="sus-co2">0</span> <span class="text-xl font-medium opacity-80">kg CO₂e</span></h3>
                     </div>
                 </div>
+
                 <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
                     <h3 class="text-lg font-bold text-slate-800 mb-4">Emissions Trend</h3>
                     <div id="chart-sus" class="w-full h-[350px]"></div>
                 </div>
+            </div>
+
+            <div id="view-budget" class="view-section space-y-6">
+                <p class="text-slate-500">Set a monthly spending goal and track whether your household is on pace.</p>
+                <div id="budget-content" class="space-y-4"></div>
+            </div>
+            <div id="view-challenges" class="view-section space-y-6">
+                <p class="text-slate-500">Build energy-saving habits through small weekly goals.</p>
+                <div id="challenges-content" class="space-y-4"></div>
+            </div>
+            <div id="view-recap" class="view-section space-y-6">
+                <div id="recap-content"></div>
+            </div>
+            <div id="view-bill" class="view-section space-y-6">
+                <p class="text-slate-500">Compare your bill with the app's estimate and review what each line item represents.</p>
+                <div id="bill-content"></div>
+            </div>
+            <div id="view-scheduler" class="view-section space-y-6">
+                <p class="text-slate-500">Find quieter two-hour windows based on recent household usage.</p>
+                <div id="scheduler-content" class="space-y-4"></div>
+            </div>
+            <div id="view-compare" class="view-section space-y-6">
+                <div id="compare-content" class="space-y-4"></div>
+            </div>
+            <div id="view-devices" class="view-section space-y-6">
+                <div id="devices-content"></div>
+            </div>
+            <div id="view-learn" class="view-section space-y-6">
+                <div id="learn-content"></div>
             </div>
 
         </div>
@@ -343,28 +436,76 @@
     </div>
 
     <script>
+        let currentUser = null;
+        let authMode = 'login';
+
         // API Helper
         const api = async (path, options) => {
-            const r = await fetch(path, { credentials: 'same-origin', ...options });
+            let r;
+            try {
+                r = await fetch(path, { credentials: 'same-origin', ...options });
+            } catch (error) {
+                if (error instanceof TypeError) {
+                    const message = `Cannot reach the EcoWatt server at ${location.origin}. Start it with python -m uvicorn server:app --reload, then retry.`;
+                    showApiError(message);
+                    throw new Error(message);
+                }
+                throw error;
+            }
+            document.getElementById('api-error-banner').classList.add('hidden');
             if (!r.ok) {
-                let message = `${r.status} ${r.statusText}`;
+                let message = r.statusText;
                 try {
                     const body = await r.json();
-                    if (typeof body.detail === 'string') message = body.detail;
-                } catch (e) {
-                    console.error('Could not read API error response', e);
+                    message = body.detail || message;
+                } catch (error) {
+                    console.error('Could not read API error response', error);
+                }
+                if (r.status === 401) {
+                    setAuthMode('login');
+                    showAuth(message);
+                } else {
+                    showApiError(`Request failed (${r.status}): ${message}`);
                 }
                 throw new Error(message);
             }
             return r.json();
         };
+        function showApiError(message) {
+            document.getElementById('api-error-message').textContent = message;
+            document.getElementById('api-error-banner').classList.remove('hidden');
+        }
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
 
+        function applyTheme(theme) {
+            const isDark = theme === 'dark';
+            document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+            const button = document.getElementById('theme-toggle');
+            button.textContent = isDark ? 'Light mode' : 'Dark mode';
+            button.setAttribute('aria-pressed', String(isDark));
+        }
+
+        document.documentElement.dataset.theme = localStorage.getItem('ecowatt-theme') || 'light';
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('ecowatt-theme', next);
+            applyTheme(next);
+        });
+        applyTheme(document.documentElement.dataset.theme);
+
+        document.querySelectorAll('.advisor-prompt').forEach(button => {
+            button.addEventListener('click', () => {
+                const input = document.getElementById('chat-input');
+                input.value = button.textContent;
+                input.focus();
+            });
+        });
         const PALETTE = ["#16a34a", "#0B4F3C", "#f59e0b", "#38bdf8"];
         const APP_COLORS = { "Air conditioner": "#16a34a", "Refrigerator": "#0B4F3C", "Water heater": "#f59e0b", "Washing machine": "#38bdf8" };
         let charts = {};
         let simTimer;
-        let authMode = 'login';
-        let currentUser = null;
 
         function showAuth(message = '') {
             document.getElementById('auth-overlay').hidden = false;
@@ -479,9 +620,30 @@
 
         async function updateOverview() {
             try {
-                const data = await api('/api/overview');
+                const [data, home] = await Promise.all([api('/api/overview'), api('/api/home')]);
                 document.getElementById('current-date-display').innerText = `${data.month} (Day ${data.day})`;
                 document.getElementById('data-source-label').innerText = data.simulated ? 'Simulated Status' : 'Live Status';
+
+                const detailed = localStorage.getItem('ecowatt-overview-detail') === 'true';
+                const scoreColor = home.score >= 70 ? '#16a34a' : home.score >= 45 ? '#f59e0b' : '#e11d48';
+                document.getElementById('eco-home-card').innerHTML = `
+                    <div class="flex flex-wrap items-center gap-5 rounded-2xl bg-gradient-to-br from-brand-900 to-brand-600 p-6 text-white shadow-lg">
+                        <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4" style="border-color:${scoreColor}">
+                            <span class="text-2xl font-extrabold">${home.score}</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-brand-100">${escapeHtml(home.greet)} · Home Eco Score ${escapeHtml(home.grade)}</p>
+                            <h3 class="mt-1 text-xl font-bold">${escapeHtml(home.headline)}</h3>
+                            <p class="mt-2 text-sm text-brand-100">Yesterday: RM ${Number(home.yesterday_rm).toFixed(2)} · Air conditioning: RM ${Number(home.ac_day_rm).toFixed(2)}/day</p>
+                        </div>
+                        <button id="overview-detail-toggle" type="button" class="rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold hover:bg-white/10">${detailed ? 'Simple view' : 'Detailed view'}</button>
+                    </div>`;
+                document.getElementById('overview-details').classList.toggle('hidden', !detailed);
+                document.getElementById('overview-detail-toggle').addEventListener('click', () => {
+                    const next = localStorage.getItem('ecowatt-overview-detail') !== 'true';
+                    localStorage.setItem('ecowatt-overview-detail', String(next));
+                    updateOverview();
+                });
                 
                 animateValue('kpi-used', 0, data.kwh, 1500, false);
                 animateValue('kpi-bill', 0, data.bill, 1500, true);
@@ -534,7 +696,7 @@
                         </div>`;
                 }).join('') : `<div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3"><i class="ph-fill ph-check-circle text-emerald-500 text-xl mt-0.5"></i><div><h4 class="font-bold text-slate-800">All Normal</h4><p class="text-sm text-slate-500 mt-1">No unusual consumption detected.</p></div></div>`;
                 document.getElementById('alerts-container').innerHTML = alertHtml;
-            } catch(e) { console.error(e); }
+            } catch(e) { showApiError(e.message); }
         }
 
         async function initMonthly() {
@@ -543,7 +705,7 @@
                 const sel = document.getElementById('month-selector');
                 sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
                 if(months.length) loadMonthlyData();
-            } catch(e) {}
+            } catch(e) { showApiError(e.message); }
         }
 
         async function loadMonthlyData() {
@@ -593,13 +755,58 @@
                     yaxis: { tickAmount: 6, labels: { style: { fontSize: '10px'} } }
                 });
                 charts.heat.render();
-            } catch(e) { console.error(e); }
+            } catch(e) { showApiError(e.message); }
+        }
+
+        async function loadHomeMap() {
+            const appliances = await api('/api/appliances');
+            let selected = Math.max(0, appliances.findIndex(app => app.status === 'abnormal'));
+            const render = () => {
+                const app = appliances[selected];
+                const cards = appliances.map((item, index) => {
+                    const color = item.status === 'abnormal' ? 'border-rose-400 bg-rose-50' : item.status === 'high' ? 'border-amber-400 bg-amber-50' : 'border-emerald-300 bg-white';
+                    return `<button type="button" data-map-index="${index}" aria-pressed="${index === selected}" class="min-h-32 rounded-xl border-2 ${color} p-4 text-left shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500 ${index === selected ? 'ring-2 ring-brand-800' : ''}">
+                        <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500">${escapeHtml(item.room)}</span>
+                        <span class="mt-2 block font-bold text-slate-800">${escapeHtml(item.name)}</span>
+                        <span class="mt-1 block text-sm text-slate-600">${Number(item.power_w).toFixed(0)} W</span>
+                        <span class="mt-2 block text-xs font-semibold">${escapeHtml(item.status)}</span>
+                    </button>`;
+                }).join('');
+                document.getElementById('map-content').innerHTML = `
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+                        <div class="mb-4 flex items-center justify-between"><h3 class="font-bold">Home layout</h3><span class="text-xs text-slate-500">Select an appliance</span></div>
+                        <div class="grid grid-cols-2 gap-3">${cards}</div>
+                        <p class="mt-4 text-xs text-slate-500">Status colors reflect usage compared with each appliance's baseline; they do not diagnose a hardware fault.</p>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">${escapeHtml(app.room)}</p>
+                        <h3 class="mt-1 text-xl font-bold">${escapeHtml(app.name)}</h3>
+                        <p class="mt-4 text-sm text-slate-600">Current reading: <b>${Number(app.power_w).toFixed(0)} W</b></p>
+                        <p class="mt-1 text-sm text-slate-600">This month: <b>${Number(app.month_kwh).toFixed(1)} kWh</b></p>
+                        <p class="mt-4 text-sm">${escapeHtml(app.why)}</p>
+                        ${app.extra_rm > 1 ? `<div class="mt-4 rounded-lg bg-brand-50 p-3 text-sm"><b>Try:</b> ${escapeHtml(app.rec)}<br>Possible saving: RM ${Number(app.extra_rm).toFixed(2)}/month.</div>` : ''}
+                        <button type="button" id="map-ask-advisor" class="mt-4 rounded-lg border border-brand-700 px-4 py-2 text-sm font-semibold text-brand-900 hover:bg-brand-50">Ask the advisor</button>
+                    </div>`;
+                document.querySelectorAll('[data-map-index]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        selected = Number(button.dataset.mapIndex);
+                        render();
+                    });
+                });
+                document.getElementById('map-ask-advisor').addEventListener('click', () => {
+                    const advisorNav = [...document.querySelectorAll('.nav-item')].find(item => item.textContent.includes('AI Advisor'));
+                    switchTab('advisor', advisorNav);
+                    document.getElementById('chat-input').value = `Why is my ${app.name.toLowerCase()} flagged and what should I do?`;
+                    document.getElementById('chat-input').focus();
+                });
+            };
+            render();
         }
 
         async function updateAppliances() {
             try {
-                const data = await api('/api/appliances');
-                const html = data.map(app => {
+                const [data, actions] = await Promise.all([api('/api/appliances'), api('/api/actions')]);
+                const html = data.map((app, index) => {
                     const isAlert = app.status === 'abnormal' || app.status === 'high';
                     return `
                     <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
@@ -607,13 +814,13 @@
                             <div>
                                 <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                                     <span class="w-3 h-3 rounded-full" style="background-color: ${APP_COLORS[app.name] || '#ccc'}"></span>
-                                    ${app.name}
+                                    ${escapeHtml(app.name)}
                                 </h3>
-                                <p class="text-xs text-slate-500 font-medium">${app.room} • ${app.rated_w}W</p>
+                                <p class="text-xs text-slate-500 font-medium">${escapeHtml(app.room)} • ${app.rated_w}W</p>
                             </div>
                             <div class="text-right">
                                 ${isAlert 
-                                    ? `<span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">${app.status}</span>`
+                                    ? `<span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">${escapeHtml(app.status)}</span>`
                                     : `<span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Normal</span>`
                                 }
                             </div>
@@ -629,12 +836,34 @@
                                     <p class="text-xl font-bold text-slate-800">${app.month_kwh.toFixed(1)} kWh</p>
                                 </div>
                             </div>
-                            <p class="text-xs text-slate-500 mb-2">${app.why}</p>
+                            <p class="text-xs text-slate-500 mb-2">${escapeHtml(app.why)}</p>
+                            <form id="action-form-${index}" class="mt-4 flex flex-wrap gap-2">
+                                <label class="sr-only" for="action-note-${index}">Action taken for ${escapeHtml(app.name)}</label>
+                                <input id="action-note-${index}" type="text" maxlength="200" required placeholder="Record an action taken" class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                <button class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white">Save</button>
+                            </form>
                         </div>
                     </div>`;
                 }).join('');
-                document.getElementById('appliances-grid').innerHTML = html;
-            } catch(e) { console.error(e); }
+                const history = actions.length ? actions.map(action => `<div class="border-t border-slate-100 py-3"><p class="font-semibold">${escapeHtml(action.appliance)} · ${escapeHtml(action.ts.replace('T', ' '))}</p><p class="text-sm text-slate-600">${escapeHtml(action.note)}</p><p class="text-xs text-slate-500">${action.days_after ? `${Number(action.before).toFixed(2)} to ${Number(action.after).toFixed(2)} kWh/day over ${action.days_after} day(s)` : 'Waiting for readings after this action to compare.'}</p></div>`).join('') : '<p class="text-sm text-slate-500">Actions you record will appear here with a before/after usage comparison.</p>';
+                document.getElementById('appliances-grid').innerHTML = `${html}<div class="rounded-2xl bg-white p-6 shadow-soft md:col-span-2"><h3 class="mb-2 text-lg font-bold">Action log</h3>${history}</div>`;
+                data.forEach((app, index) => {
+                    document.getElementById(`action-form-${index}`).addEventListener('submit', async event => {
+                        event.preventDefault();
+                        const note = document.getElementById(`action-note-${index}`).value.trim();
+                        if (!note) return;
+                        try {
+                            await api('/api/actions', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ appliance: app.name, note })
+                            });
+                            await updateAppliances();
+                        } catch (error) {
+                            showFeatureError('appliances-grid', error);
+                        }
+                    });
+                });
+            } catch(e) { showApiError(e.message); }
         }
 
         async function updateSim() {
@@ -662,7 +891,7 @@
                         xaxis: { categories: data.items.map(i => i.action) }
                     });
                     charts.sim.render();
-                } catch(e) { console.error(e); }
+                } catch(e) { showApiError(e.message); }
             }, 150);
         }
 
@@ -679,7 +908,235 @@
                     xaxis: { categories: data.months }, yaxis: { title: { text: 'kg CO₂e' } }
                 });
                 charts.sus.render();
-            } catch(e) { console.error(e); }
+            } catch(e) { showApiError(e.message); }
+        }
+
+        async function loadBudget() {
+            const data = await api('/api/budget');
+            const percent = Math.min(100, Math.round(data.spent / data.budget * 100));
+            document.getElementById('budget-content').innerHTML = `
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="rounded-2xl bg-white p-6 shadow-soft">
+                        <p class="text-sm text-slate-500">Spent so far</p>
+                        <p class="mt-1 text-3xl font-bold text-brand-900">RM ${data.spent.toFixed(2)}</p>
+                        <p class="mt-2 text-sm text-slate-500">Monthly budget RM ${data.budget.toFixed(2)}</p>
+                        <div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full ${data.pace > 1 ? 'bg-rose-500' : 'bg-brand-500'}" style="width:${percent}%"></div></div>
+                        <p class="mt-2 text-sm text-slate-500">${percent}% of your budget used</p>
+                    </div>
+                    <div class="rounded-2xl bg-white p-6 shadow-soft">
+                        <p class="font-semibold text-slate-800">${escapeHtml(data.msg)}</p>
+                        <p class="mt-2 text-sm text-slate-500">Projected bill: RM ${data.proj_bill.toFixed(2)} · ${data.left} days left</p>
+                        <p class="mt-2 text-sm text-slate-500">Target about ${data.daily_kwh.toFixed(1)} kWh/day to stay within budget.</p>
+                        <form id="budget-form" class="mt-4 flex flex-wrap gap-2">
+                            <label class="sr-only" for="budget-input">Monthly budget in RM</label>
+                            <input id="budget-input" type="number" min="20" max="5000" step="1" value="${data.budget}" required class="w-36 rounded-lg border border-slate-300 px-3 py-2">
+                            <button class="rounded-lg bg-brand-800 px-4 py-2 font-semibold text-white">Save budget</button>
+                        </form>
+                    </div>
+                </div>`;
+            document.getElementById('budget-form').addEventListener('submit', async event => {
+                event.preventDefault();
+                const budget = Number(document.getElementById('budget-input').value);
+                try {
+                    await api('/api/budget', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ budget }) });
+                    await loadBudget();
+                } catch (error) {
+                    showFeatureError('budget-content', error);
+                }
+            });
+        }
+
+        async function loadChallenges() {
+            const data = await api('/api/challenges');
+            document.getElementById('challenges-content').innerHTML = `
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">Current streak</p><p class="text-3xl font-bold text-brand-900">${data.streak} days</p></div>
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">Level</p><p class="text-3xl font-bold text-brand-900">${data.level}</p><p class="text-sm text-slate-500">${data.to_next} XP to next level</p></div>
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">Experience points</p><p class="text-3xl font-bold text-brand-900">${data.xp} XP</p></div>
+                </div>
+                <h3 class="text-lg font-bold">Weekly missions</h3>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">${data.missions.map(m => `<div class="rounded-xl bg-white p-5 shadow-soft"><p class="font-semibold">${escapeHtml(m.name)}</p><p class="mt-2 text-sm text-slate-500">${m.done} of ${m.goal} complete</p><div class="mt-3 h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-brand-500" style="width:${Math.min(100, m.done / m.goal * 100)}%"></div></div></div>`).join('')}</div>
+                <h3 class="text-lg font-bold">Badges</h3>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">${data.badges.map(b => `<div class="rounded-xl border p-4 ${b.got ? 'border-brand-200 bg-brand-50' : 'border-slate-200 bg-white opacity-60'}"><p class="font-bold">${b.got ? '✓ ' : ''}${escapeHtml(b.name)}</p><p class="mt-1 text-sm text-slate-500">${escapeHtml(b.desc)}</p></div>`).join('')}</div>`;
+            showChallengeConfetti();
+        }
+
+        function showChallengeConfetti() {
+            const colors = ['#16a34a', '#0B4F3C', '#f59e0b', '#38bdf8', '#a855f7'];
+            for (let i = 0; i < 70; i++) {
+                const piece = document.createElement('span');
+                piece.className = 'confetti-piece';
+                piece.setAttribute('aria-hidden', 'true');
+                piece.style.left = `${Math.random() * 100}vw`;
+                piece.style.backgroundColor = colors[i % colors.length];
+                piece.style.animationDelay = `${Math.random() * 0.8}s`;
+                piece.style.animationDuration = `${2 + Math.random() * 1.2}s`;
+                piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+                document.body.appendChild(piece);
+                window.setTimeout(() => piece.remove(), 4200);
+            }
+        }
+
+        async function loadRecap() {
+            const data = await api('/api/recap');
+            const direction = data.change > 0 ? 'up' : 'down';
+            const summary = `My EcoWatt weekly recap (${data.start} to ${data.end}): ${data.persona}, ${Number(data.kwh).toFixed(1)} kWh, RM ${Number(data.rm).toFixed(2)}, ${direction} ${Math.abs(data.change * 100).toFixed(1)}% vs the week before. Biggest user: ${data.top}.`;
+            document.getElementById('recap-content').innerHTML = `
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <div class="rounded-2xl bg-gradient-to-br from-brand-900 to-brand-600 p-8 text-white shadow-lg">
+                        <p class="text-brand-100">${escapeHtml(data.start)} to ${escapeHtml(data.end)}</p>
+                        <p class="mt-2 text-sm text-brand-100">Your energy persona</p><h3 class="text-3xl font-bold">${escapeHtml(data.persona)}</h3>
+                        <div class="mt-6 grid grid-cols-2 gap-4">
+                            <div><p class="text-sm text-brand-100">Energy used</p><p class="text-2xl font-bold">${Number(data.kwh).toFixed(1)} kWh</p></div>
+                            <div><p class="text-sm text-brand-100">Estimated cost</p><p class="text-2xl font-bold">RM ${Number(data.rm).toFixed(2)}</p></div>
+                            <div><p class="text-sm text-brand-100">Compared with previous week</p><p class="font-bold">${direction} ${Math.abs(data.change * 100).toFixed(1)}%</p></div>
+                            <div><p class="text-sm text-brand-100">Largest appliance use</p><p class="font-bold">${escapeHtml(data.top)}</p></div>
+                            <div><p class="text-sm text-brand-100">Best day</p><p class="font-bold">${escapeHtml(data.best)} · ${Number(data.best_kwh).toFixed(1)} kWh</p></div>
+                            <div><p class="text-sm text-brand-100">Busiest day</p><p class="font-bold">${escapeHtml(data.worst)} · ${Number(data.worst_kwh).toFixed(1)} kWh</p></div>
+                        </div>
+                        <p class="mt-5 text-sm text-brand-100">Tip: ${escapeHtml(data.tip)}</p>
+                        <button id="share-recap" type="button" class="mt-5 rounded-lg border border-white/50 px-4 py-2 text-sm font-semibold hover:bg-white/10">Copy weekly summary</button>
+                        <span id="recap-copy-status" class="ml-3 text-sm" role="status"></span>
+                    </div>
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><h3 class="mb-3 font-bold">Daily energy use</h3><div id="chart-recap"></div></div>
+                </div>`;
+            if (charts.recap) charts.recap.destroy();
+            charts.recap = new ApexCharts(document.querySelector('#chart-recap'), {
+                series: [{ name: 'Energy (kWh)', data: data.vals.map(Number) }],
+                chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                colors: ['#16a34a'], dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 3 },
+                xaxis: { categories: data.dates, labels: { rotate: -35 } },
+                yaxis: { title: { text: 'kWh' } }, fill: { opacity: 0.2 }
+            });
+            charts.recap.render();
+            document.getElementById('share-recap').addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(summary);
+                    document.getElementById('recap-copy-status').textContent = 'Copied!';
+                } catch {
+                    document.getElementById('recap-copy-status').textContent = 'Clipboard unavailable in this browser.';
+                }
+            });
+        }
+
+        async function loadScheduler() {
+            const data = await api('/api/scheduler');
+            document.getElementById('scheduler-content').innerHTML = `
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">${data.windows.map((window, index) => `<div class="rounded-2xl bg-white p-6 shadow-soft"><p class="text-sm text-slate-500">Recommended window ${index + 1}</p><p class="mt-1 text-2xl font-bold text-brand-900">${escapeHtml(window.start)}–${escapeHtml(window.end)}</p><p class="mt-2 text-sm text-slate-500">Average combined load: ${Number(window.load).toFixed(2)} kWh</p></div>`).join('')}</div>
+                <div class="rounded-2xl bg-white p-5 shadow-soft"><h3 class="mb-2 font-bold">Average household load by hour</h3><div id="chart-scheduler"></div></div>
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">These windows reflect recent usage, not electricity prices. Check your tariff before scheduling appliances to save money.</div>`;
+            if (charts.scheduler) charts.scheduler.destroy();
+            charts.scheduler = new ApexCharts(document.querySelector('#chart-scheduler'), {
+                series: [{ name: 'Average kWh', data: data.load.map(Number) }],
+                chart: { type: 'bar', height: 280, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                colors: ['#86efac'], plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
+                xaxis: { categories: data.hours.map(hour => `${String(hour).padStart(2, '0')}:00`) },
+                yaxis: { title: { text: 'Average kWh' } }, dataLabels: { enabled: false }
+            });
+            charts.scheduler.render();
+        }
+
+        async function loadComparison() {
+            const data = await api('/api/compare');
+            const keys = Object.keys(data.this);
+            const change = data.prev_total ? (data.this_total / data.prev_total - 1) * 100 : null;
+            document.getElementById('compare-content').innerHTML = `
+                <p class="text-slate-500">First ${data.day} days of this month compared with the same number of days last month.</p>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">This month so far</p><p class="text-2xl font-bold">${data.this_total.toFixed(1)} kWh</p></div>
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">Change vs last month</p><p class="text-2xl font-bold">${change === null ? 'No comparison data' : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`}</p></div>
+                    <div class="rounded-2xl bg-white p-5 shadow-soft"><p class="text-sm text-slate-500">Daily average</p><p class="text-sm">Weekday ${Number(data.weekday || 0).toFixed(1)} kWh · Weekend ${Number(data.weekend || 0).toFixed(1)} kWh</p></div>
+                </div><div class="rounded-2xl bg-white p-5 shadow-soft"><div id="chart-compare"></div></div>`;
+            if (charts.compare) charts.compare.destroy();
+            charts.compare = new ApexCharts(document.querySelector('#chart-compare'), {
+                series: [
+                    { name: 'Last month', data: keys.map(name => Number(data.prev[name] || 0)) },
+                    { name: 'This month', data: keys.map(name => Number(data.this[name] || 0)) }
+                ],
+                chart: { type: 'bar', height: 320, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                colors: ['#86efac', '#166534'], plotOptions: { bar: { horizontal: false, columnWidth: '55%' } },
+                xaxis: { categories: keys }, yaxis: { title: { text: 'kWh' } }, dataLabels: { enabled: false }
+            });
+            charts.compare.render();
+        }
+
+        async function loadDevices() {
+            const data = await api('/api/devices');
+            document.getElementById('devices-content').innerHTML = `
+                <p class="mb-4 text-slate-500">Readings are currently simulated until real sensors are connected.</p>
+                <div class="overflow-x-auto rounded-2xl bg-white shadow-soft"><table class="w-full text-left text-sm"><thead class="bg-slate-100"><tr><th class="p-3">Appliance</th><th class="p-3">Room</th><th class="p-3">Last reading</th><th class="p-3">Readings</th><th class="p-3">Source</th></tr></thead>
+                <tbody>${data.map(device => `<tr class="border-t"><td class="p-3 font-semibold">${escapeHtml(device.name)}</td><td class="p-3">${escapeHtml(device.room)}</td><td class="p-3">${escapeHtml(device.last)}</td><td class="p-3">${device.n}</td><td class="p-3">${escapeHtml(device.src)}</td></tr>`).join('')}</tbody></table></div>
+                <div class="mt-5 rounded-2xl bg-white p-6 shadow-soft">
+                    <h3 class="font-bold">Connect a sensor</h3>
+                    <p class="mt-1 text-sm text-slate-500">Set a private INGEST_TOKEN in the server environment. This one-time test asks for it without saving or displaying it. Never commit the token.</p>
+                    <button id="test-reading" type="button" class="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white">Send a test reading</button>
+                    <p id="device-test-status" class="mt-2 text-sm" role="status"></p>
+                </div>`;
+            document.getElementById('test-reading').addEventListener('click', async () => {
+                const token = window.prompt('Enter the configured sensor-ingestion token. It will not be saved.');
+                if (token === null) return;
+                const status = document.getElementById('device-test-status');
+                status.textContent = 'Sending test reading…';
+                try {
+                    await api('/api/readings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Token': token },
+                        body: JSON.stringify({ appliance: 'Refrigerator', kwh: 0.05 })
+                    });
+                    status.textContent = 'Test reading accepted.';
+                    await loadDevices();
+                } catch (error) {
+                    status.textContent = error.message;
+                }
+            });
+        }
+
+        async function loadBillExplainer() {
+            document.getElementById('bill-content').innerHTML = `
+                <form id="bill-form" class="flex flex-wrap items-end gap-3 rounded-2xl bg-white p-6 shadow-soft">
+                    <label class="text-sm font-medium">Usage (kWh)<input id="bill-kwh" type="number" min="0" step="0.1" value="400" required class="mt-1 block w-36 rounded-lg border border-slate-300 px-3 py-2"></label>
+                    <label class="text-sm font-medium">Bill amount (RM)<input id="bill-amount" type="number" min="0" step="0.01" value="150" required class="mt-1 block w-36 rounded-lg border border-slate-300 px-3 py-2"></label>
+                    <button class="rounded-lg bg-brand-800 px-4 py-2 font-semibold text-white">Compare bill</button>
+                </form><div id="bill-result" class="mt-4"></div>`;
+            document.getElementById('bill-form').addEventListener('submit', async event => {
+                event.preventDefault();
+                const result = document.getElementById('bill-result');
+                try {
+                    const data = await api('/api/bill-check', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ kwh: Number(document.getElementById('bill-kwh').value), amount: Number(document.getElementById('bill-amount').value) })
+                    });
+                    result.innerHTML = `<div class="rounded-xl ${data.close ? 'bg-brand-50' : 'bg-amber-50'} p-4"><p class="font-semibold">${escapeHtml(data.verdict)}</p><p class="mt-1 text-sm">Our estimate: RM ${data.estimate.toFixed(2)}</p></div>
+                        <h3 class="my-4 font-bold">Estimated bill line items</h3><div class="space-y-2">${data.rows.map(row => `<div class="rounded-xl bg-white p-4 shadow-soft"><div class="flex justify-between gap-4"><b>${escapeHtml(row.name)}</b><b>RM ${Number(row.rm).toFixed(2)}</b></div><p class="mt-1 text-sm text-slate-500">${escapeHtml(row.why)}</p></div>`).join('')}</div>`;
+                } catch (error) {
+                    showFeatureError('bill-result', error);
+                }
+            });
+        }
+
+        async function loadLearning() {
+            const tips = [
+                ['Set the air conditioner to 25°C', 'A higher setpoint can reduce cooling energy; actual savings vary by home and weather.'],
+                ['Clean air-conditioner filters', 'Clogged filters can make a unit work harder. Check them regularly.'],
+                ['Run full washing-machine loads', 'Choose an appropriate load size and cold-water cycles where possible.'],
+                ['Check refrigerator door seals', 'A worn seal may let warm air in and keep the compressor running longer.'],
+                ['Shorten hot showers', 'Water heating can be a significant household load.']
+            ];
+            const myths = [
+                ['Does a phone charger use meaningful power when unplugged from the phone?', 'Usually very little on its own. Many standby loads together can still add up.'],
+                ['Is it always wasteful to turn an air conditioner off and on?', 'No. Cooling an empty room continuously generally uses more energy than switching it off when not needed.'],
+                ['Does high usage prove an appliance is broken?', 'No. A higher reading is not proof of a fault. Check usage patterns and conditions before considering a repair.']
+            ];
+            document.getElementById('learn-content').innerHTML = `
+                <h3 class="mb-3 text-lg font-bold">Everyday energy tips</h3>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">${tips.map(([title, text]) => `<div class="rounded-2xl bg-white p-5 shadow-soft"><h4 class="font-bold">${escapeHtml(title)}</h4><p class="mt-2 text-sm text-slate-500">${escapeHtml(text)}</p></div>`).join('')}</div>
+                <h3 class="mb-3 mt-6 text-lg font-bold">Myth or fact?</h3>
+                <div class="space-y-3">${myths.map(([question, answer]) => `<details class="rounded-xl bg-white p-5 shadow-soft"><summary class="cursor-pointer font-semibold">${escapeHtml(question)}</summary><p class="mt-3 text-sm text-slate-600">${escapeHtml(answer)}</p></details>`).join('')}</div>`;
+        }
+
+        function showFeatureError(id, error) {
+            const element = document.getElementById(id);
+            if (element) element.insertAdjacentHTML('afterbegin', `<p class="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">${escapeHtml(error.message || 'The request failed.')}</p>`);
         }
 
         async function handleChat(e) {
@@ -689,7 +1146,7 @@
             if(!val) return;
 
             const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="flex gap-4 max-w-[80%] self-end ml-auto"><div class="bg-brand-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm text-sm">${val.replace(/</g, "&lt;")}</div></div>`;
+            box.innerHTML += `<div class="flex gap-4 max-w-[80%] self-end ml-auto"><div class="bg-brand-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm text-sm">${escapeHtml(val)}</div></div>`;
             input.value = '';
             box.scrollTop = box.scrollHeight;
 
@@ -704,30 +1161,49 @@
                 document.getElementById('typing-indicator').remove();
                 
                 // Format markdown bold/newlines simply
-                const fmtAns = res.answer.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                const fmtAns = escapeHtml(res.answer).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 box.innerHTML += `<div class="flex gap-4 max-w-[80%]"><div class="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center flex-shrink-0 text-brand-700"><i class="ph-fill ph-robot"></i></div><div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 text-slate-700 text-sm leading-relaxed">${fmtAns}</div></div>`;
                 box.scrollTop = box.scrollHeight;
             } catch(e) {
                 document.getElementById('typing-indicator').remove();
-                box.innerHTML += `<div class="flex gap-4 max-w-[80%]"><div class="bg-rose-50 text-rose-700 border border-rose-200 p-4 rounded-2xl shadow-sm text-sm">Sorry, the server couldn't be reached.</div></div>`;
+                const message = e.message || 'The advisor request failed.';
+                box.insertAdjacentHTML('beforeend', `<div class="flex gap-4 max-w-[80%]"><div class="bg-rose-50 text-rose-700 border border-rose-200 p-4 rounded-2xl shadow-sm text-sm">${escapeHtml(message)}</div></div>`);
+                box.scrollTop = box.scrollHeight;
             }
         }
 
         // Navigation
-        function switchTab(tabId) {
+        function switchTab(tabId, navItem) {
+            if (!currentUser) {
+                showAuth();
+                return;
+            }
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            if (navItem) navItem.classList.add('active');
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(`view-${tabId}`).classList.add('active');
 
-            const titles = { 'overview': 'Dashboard Overview', 'monthly': 'Monthly Report', 'appliances': 'Appliance Monitoring', 'advisor': 'AI Energy Advisor', 'simulator': 'Savings Simulator', 'sustainability': 'Environmental Impact' };
+            const titles = {
+                overview: 'Dashboard Overview', monthly: 'Monthly Report', map: 'Home Map', appliances: 'Appliance Monitoring',
+                advisor: 'AI Energy Advisor', simulator: 'Savings Simulator', sustainability: 'Environmental Impact',
+                budget: 'Budget & Goals', challenges: 'Energy Challenges', recap: 'Weekly Recap',
+                bill: 'Bill Explainer', scheduler: 'Smart Scheduler', compare: 'Usage Comparison',
+                devices: 'Connected Devices', learn: 'Learn About Energy'
+            };
             document.getElementById('page-title').innerText = titles[tabId];
 
             if (tabId === 'overview') updateOverview();
             if (tabId === 'monthly' && !document.getElementById('month-selector').options.length) initMonthly();
+            if (tabId === 'map') loadHomeMap().catch(error => showFeatureError('map-content', error));
             if (tabId === 'appliances') updateAppliances();
             if (tabId === 'simulator') updateSim();
             if (tabId === 'sustainability') updateSustainability();
+            const loaders = {
+                budget: loadBudget, challenges: loadChallenges, recap: loadRecap,
+                bill: loadBillExplainer, scheduler: loadScheduler, compare: loadComparison,
+                devices: loadDevices, learn: loadLearning
+            };
+            if (loaders[tabId]) loaders[tabId]().catch(error => showFeatureError(`${tabId}-content`, error));
             
             if (window.innerWidth < 768) toggleSidebar();
         }

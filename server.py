@@ -15,6 +15,7 @@ from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
 import auth, core
+import friendly_features
 from config import GEMINI_API_KEY, GRID_KG_PER_KWH as EF
 
 HERE = os.path.dirname(__file__)
@@ -174,6 +175,11 @@ def data():
     return _c["df"]
 
 
+def invalidate_data():
+    _c["t"] = 0
+    _c["df"] = None
+
+
 def clean(o):
     if isinstance(o, dict): return {str(k): clean(v) for k, v in o.items()}
     if isinstance(o, (list, tuple)): return [clean(v) for v in o]
@@ -308,6 +314,9 @@ def sustainability(user=Depends(require_role("resident"))):
     return clean(dict(kg=kg, prev=prev, change=(kg / prev - 1) if prev else None, km=kg / 0.17, trees=kg / 21, ef=EF,
                       wins=[dict(appliance=r.appliance, rec=core.RECS[r.appliance], rm=r.extra_month_rm, kg=r.extra_month_kwh * EF) for r in fl.itertuples()],
                       months=list(mon.index), month_kg=list(mon.values)))
+
+
+friendly_features.register(app, data, ctx, clean, invalidate_data, require_role("resident"))
 
 
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")

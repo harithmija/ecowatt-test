@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+ecowatt.db
+mobile/.dart_tool/
+mobile/build/
+mobile/mobile_runner/.dart_tool/
+mobile/mobile_runner/build/

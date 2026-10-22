@@ -1,20 +1,155 @@
 """EcoWatt AI web server. Run: uvicorn server:app --reload"""
 import logging, math, os, time
 from datetime import datetime
+import hmac
+import re
+import sqlite3
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-import core
+from pydantic import BaseModel, Field
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
+import auth, core
 from config import GEMINI_API_KEY, GRID_KG_PER_KWH as EF
 
 HERE = os.path.dirname(__file__)
 app = FastAPI(title="EcoWatt AI")
 logger = logging.getLogger(__name__)
 core.init_db()
+auth.init_db()
 _c = {"t": 0, "df": None}
+SESSION_COOKIE = "ecowatt_session"
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+
+class Signup(BaseModel):
+    name: str = Field(max_length=80)
+    email: str = Field(max_length=254)
+    password: str = Field(min_length=12, max_length=128)
+
+
+class Login(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=128)
+
+
+class GoogleCredential(BaseModel):
+    credential: str = Field(min_length=1, max_length=10000)
+    nonce: str = Field(min_length=1, max_length=200)
+
+
+def require_user(request: Request):
+    token = request.cookies.get(SESSION_COOKIE)
+    user = auth.session_user(token) if token else None
+    if user is None:
+        raise HTTPException(401, "Please sign in to continue")
+    return user
+
+
+def require_role(role):
+    def check_role(user=Depends(require_user)):
+        if user["role"] != role:
+            raise HTTPException(403, "This account does not have access to this page")
+        return user
+    return check_role
+
+
+def set_session_cookie(response, user):
+    token = auth.create_session(user["id"])
+    response.set_cookie(
+        SESSION_COOKIE, token, max_age=auth.SESSION_SECONDS, httponly=True,
+        secure=COOKIE_SECURE, samesite="strict", path="/",
+    )
+
+
+@app.post("/api/auth/signup", status_code=201)
+def signup(account: Signup, response: Response):
+    name, email = account.name.strip(), account.email.strip().lower()
+    if not name or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(400, "Enter a name and a valid email")
+    try:
+        user = auth.create_account(email, name, "resident", account.password)
+    except sqlite3.IntegrityError as exc:
+        if "accounts.email" in str(exc):
+            raise HTTPException(409, "An account with that email already exists") from exc
+        raise
+    set_session_cookie(response, user)
+    return {"user": user}
+
+
+@app.post("/api/auth/login")
+def login(credentials: Login, response: Response):
+    user = auth.authenticate(credentials.email.strip(), credentials.password)
+    if user is None or user["role"] != "resident":
+        raise HTTPException(401, "Email or password is incorrect")
+    set_session_cookie(response, user)
+    return {"user": user}
+
+
+@app.get("/api/auth/config")
+def auth_config():
+    return {"google_client_id": GOOGLE_CLIENT_ID or None}
+
+
+@app.post("/api/auth/google/nonce")
+def google_login_nonce():
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(503, "Google sign-in is not configured")
+    return {"nonce": auth.create_google_nonce()}
+
+
+@app.post("/api/auth/google")
+def google_login(credentials: GoogleCredential, response: Response):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(503, "Google sign-in is not configured")
+    try:
+        claims = id_token.verify_oauth2_token(
+            credentials.credential, GoogleRequest(), GOOGLE_CLIENT_ID
+        )
+    except (ValueError, GoogleAuthError) as exc:
+        raise HTTPException(401, "Google sign-in could not be verified") from exc
+    token_nonce = claims.get("nonce", "")
+    if not token_nonce or not hmac.compare_digest(token_nonce, credentials.nonce):
+        raise HTTPException(401, "Google sign-in could not be verified")
+    if not auth.consume_google_nonce(credentials.nonce):
+        raise HTTPException(401, "Google sign-in expired or was already used; please try again")
+    email = claims.get("email", "")
+    subject = claims.get("sub", "")
+    name = claims.get("name") or email.split("@", 1)[0]
+    if claims.get("email_verified") is not True or not subject or not email:
+        raise HTTPException(401, "Google must provide a verified email")
+    try:
+        user = auth.authenticate_google(subject, email.strip().lower(), name.strip())
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(409, "This Google account could not be linked") from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    set_session_cookie(response, user)
+    return {"user": user}
+
+
+@app.get("/api/auth/me")
+def who_am_i(request: Request):
+    token = request.cookies.get(SESSION_COOKIE)
+    user = auth.session_user(token) if token else None
+    if user and user["role"] != "resident":
+        auth.delete_session(token)
+        user = None
+    return {"user": user}
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response):
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        auth.delete_session(token)
+    response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, secure=COOKIE_SECURE, samesite="strict")
+    return {"ok": True}
 
 
 def data():
@@ -41,7 +176,7 @@ def ctx():
 
 
 @app.get("/api/overview")
-def overview():
+def overview(user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     fl = st[st.status.isin(["abnormal", "high"])].sort_values("extra_month_rm", ascending=False)
     t30 = df[df.date > last - pd.Timedelta(days=30)].groupby(["date", "appliance"]).kwh.sum().unstack().fillna(0)
@@ -55,12 +190,12 @@ def overview():
 
 
 @app.get("/api/months")
-def months():
+def months(user=Depends(require_role("resident"))):
     return sorted(df_m for df_m in data().date.dt.strftime("%Y-%m").unique())[::-1]
 
 
 @app.get("/api/monthly")
-def monthly(month: str):
+def monthly(month: str, user=Depends(require_role("resident"))):
     df, last, *_ = ctx()
     d = df[df.date.dt.strftime("%Y-%m") == month]
     if d.empty:
@@ -79,7 +214,7 @@ def monthly(month: str):
 
 
 @app.get("/api/appliances")
-def appliances():
+def appliances(user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     out = []
     for name, w, room in core.APPLIANCES.values():
@@ -97,7 +232,7 @@ class Act(BaseModel):
 
 
 @app.post("/api/actions")
-def add_action(a: Act):
+def add_action(a: Act, user=Depends(require_role("resident"))):
     if a.appliance not in [v[0] for v in core.APPLIANCES.values()] or not a.note.strip():
         raise HTTPException(400, "Invalid action")
     core.add_action(a.appliance, a.note.strip()[:200])
@@ -105,7 +240,7 @@ def add_action(a: Act):
 
 
 @app.get("/api/actions")
-def actions():
+def actions(user=Depends(require_role("resident"))):
     df, acts, out = data(), core.load_actions(), []
     for x in acts.itertuples():
         b, a, n = core.review_action(df, x.appliance, x.ts)
@@ -118,7 +253,7 @@ class Q(BaseModel):
 
 
 @app.post("/api/chat")
-def chat(q: Q):
+def chat(q: Q, user=Depends(require_role("resident"))):
     df = data()
     if not GEMINI_API_KEY:
         ans = core.fallback_answer(df, None, q.question)
@@ -134,7 +269,7 @@ def chat(q: Q):
 
 
 @app.get("/api/simulate")
-def simulate(hours: float = 1, setpoint: int = 1, heater: int = 20):
+def simulate(hours: float = 1, setpoint: int = 1, heater: int = 20, user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     day = lambda n: df[df.appliance == n].groupby("date").kwh.sum().iloc[-8:-1].mean()
     ac, wh = day("Air conditioner"), day("Water heater")
@@ -148,7 +283,7 @@ def simulate(hours: float = 1, setpoint: int = 1, heater: int = 20):
 
 
 @app.get("/api/sustainability")
-def sustainability():
+def sustainability(user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     prev = df[df.date.dt.to_period("M") == last.to_period("M") - 1].kwh.sum() * EF
     kg = proj * EF

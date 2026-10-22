@@ -8,8 +8,6 @@ The API key is optional. Without it, the built-in rules answer. In PowerShell, s
 
 The app provides resident sign-up and sign-in. Accounts and hashed passwords are stored in `ecowatt.db`; browser sessions use an HTTP-only cookie and expire after seven days. Passwords must be at least 12 characters.
 
-The native Flutter resident app source and Android/iOS setup instructions are in [mobile/README.md](./mobile/README.md). It uses the same FastAPI backend; run Uvicorn on a reachable host and configure the app's API base URL for a physical phone or deployed server.
-
 Google sign-in is also supported. Create a Google OAuth 2.0 **Web application** client ID in Google Cloud Console, add the app origin (for local development, `http://localhost:8000` and/or `http://127.0.0.1:8000`) to its authorized JavaScript origins, then set the client ID before starting Uvicorn:
 
     $env:GOOGLE_CLIENT_ID = "your-client-id.apps.googleusercontent.com"

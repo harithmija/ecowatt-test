@@ -7,6 +7,7 @@ import sqlite3
 import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -18,6 +19,21 @@ from config import GEMINI_API_KEY, GRID_KG_PER_KWH as EF
 
 HERE = os.path.dirname(__file__)
 app = FastAPI(title="EcoWatt AI")
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5000,http://127.0.0.1:5000",
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 logger = logging.getLogger(__name__)
 core.init_db()
 auth.init_db()

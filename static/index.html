@@ -30,6 +30,7 @@
         .nav-item:not(.active):hover { background-color: rgba(255,255,255,0.1); border-radius: 0.75rem; }
         .view-section { display: none; animation: fadeIn 0.4s ease-out forwards; }
         .view-section.active { display: block; }
+        [hidden] { display: none !important; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .pulse-dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: pulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1); }
         @keyframes pulse { to { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
@@ -99,8 +100,12 @@
                     <i class="ph ph-calendar-blank mr-1 inline-block align-text-top"></i>
                     <span id="current-date-display">Loading...</span>
                 </div>
-                <div class="h-10 w-10 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-bold border-2 border-white shadow-sm">
-                    UT
+                <div id="user-controls" class="text-right" hidden>
+                    <div id="user-name" class="hidden text-sm font-semibold text-slate-700 sm:block"></div>
+                    <button type="button" onclick="signOut()" class="text-xs text-slate-500 hover:text-rose-600">Sign out</button>
+                </div>
+                <div id="user-avatar" class="h-10 w-10 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-bold border-2 border-white shadow-sm" aria-hidden="true">
+                    EW
                 </div>
             </div>
         </header>
@@ -303,11 +308,54 @@
         </div>
     </main>
 
+    <div id="auth-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4" hidden>
+        <section class="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <div class="mb-6 flex items-center gap-3">
+                <div class="rounded-xl bg-brand-600 p-3 text-white"><i class="ph-fill ph-leaf text-2xl"></i></div>
+                <div>
+                    <p class="text-sm font-semibold text-brand-600">EcoWatt AI</p>
+                    <h2 id="auth-title" class="text-2xl font-bold text-slate-800">Welcome back</h2>
+                </div>
+            </div>
+            <p id="auth-description" class="mb-6 text-sm text-slate-500">Sign in to view your household energy dashboard.</p>
+            <form id="auth-form" onsubmit="submitAuth(event)" class="space-y-4">
+                <label id="name-field" class="block" hidden>
+                    <span class="mb-1 block text-sm font-medium text-slate-700">Full name</span>
+                    <input id="auth-name" name="name" type="text" maxlength="80" autocomplete="name" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                </label>
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-slate-700">Email</span>
+                    <input id="auth-email" name="email" type="email" maxlength="254" required autocomplete="email" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                </label>
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-slate-700">Password</span>
+                    <input id="auth-password" name="password" type="password" minlength="12" maxlength="128" required autocomplete="current-password" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                    <span id="password-hint" class="mt-1 block text-xs text-slate-400">Use your resident account password.</span>
+                </label>
+                <p id="auth-error" class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert" hidden></p>
+                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-800 disabled:cursor-wait disabled:opacity-60">Sign in</button>
+            </form>
+            <p class="mt-6 text-center text-sm text-slate-500">
+                <span id="auth-switch-prompt">New to EcoWatt?</span>
+                <button id="auth-switch" type="button" onclick="toggleAuthMode()" class="ml-1 font-semibold text-brand-600 hover:text-brand-800">Create an account</button>
+            </p>
+        </section>
+    </div>
+
     <script>
         // API Helper
         const api = async (path, options) => {
-            const r = await fetch(path, options);
-            if (!r.ok) throw new Error(r.statusText);
+            const r = await fetch(path, { credentials: 'same-origin', ...options });
+            if (!r.ok) {
+                let message = `${r.status} ${r.statusText}`;
+                try {
+                    const body = await r.json();
+                    if (typeof body.detail === 'string') message = body.detail;
+                } catch (e) {
+                    console.error('Could not read API error response', e);
+                }
+                throw new Error(message);
+            }
             return r.json();
         };
 
@@ -315,6 +363,105 @@
         const APP_COLORS = { "Air conditioner": "#16a34a", "Refrigerator": "#0B4F3C", "Water heater": "#f59e0b", "Washing machine": "#38bdf8" };
         let charts = {};
         let simTimer;
+        let authMode = 'login';
+        let currentUser = null;
+
+        function showAuth(message = '') {
+            document.getElementById('auth-overlay').hidden = false;
+            document.getElementById('auth-error').textContent = message;
+            document.getElementById('auth-error').hidden = !message;
+            document.getElementById('auth-email').focus();
+        }
+
+        function setAuthMode(mode) {
+            authMode = mode;
+            const signup = mode === 'signup';
+            document.getElementById('auth-title').textContent = signup ? 'Create your account' : 'Welcome back';
+            document.getElementById('auth-description').textContent = signup
+                ? 'Create a resident account to start exploring your household energy dashboard.'
+                : 'Sign in to view your household energy dashboard.';
+            document.getElementById('name-field').hidden = !signup;
+            document.getElementById('auth-name').required = signup;
+            document.getElementById('auth-password').autocomplete = signup ? 'new-password' : 'current-password';
+            document.getElementById('password-hint').textContent = signup
+                ? 'Use at least 12 characters.'
+                : 'Use your resident account password.';
+            document.getElementById('auth-submit').textContent = signup ? 'Create account' : 'Sign in';
+            document.getElementById('auth-switch-prompt').textContent = signup ? 'Already have an account?' : 'New to EcoWatt?';
+            document.getElementById('auth-switch').textContent = signup ? 'Sign in' : 'Create an account';
+            document.getElementById('auth-error').hidden = true;
+        }
+
+        function toggleAuthMode() {
+            setAuthMode(authMode === 'login' ? 'signup' : 'login');
+        }
+
+        function setCurrentUser(user) {
+            currentUser = user;
+            document.getElementById('user-controls').hidden = false;
+            document.getElementById('user-name').textContent = user.name;
+            document.getElementById('user-avatar').textContent = user.name
+                .trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+            document.getElementById('auth-overlay').hidden = true;
+            document.getElementById('auth-form').reset();
+            setAuthMode('login');
+            updateOverview();
+        }
+
+        async function submitAuth(event) {
+            event.preventDefault();
+            const signup = authMode === 'signup';
+            const submit = document.getElementById('auth-submit');
+            const error = document.getElementById('auth-error');
+            const body = {
+                email: document.getElementById('auth-email').value.trim(),
+                password: document.getElementById('auth-password').value
+            };
+            if (signup) body.name = document.getElementById('auth-name').value.trim();
+            submit.disabled = true;
+            submit.textContent = signup ? 'Creating account...' : 'Signing in...';
+            error.hidden = true;
+            try {
+                const result = await api(signup ? '/api/auth/signup' : '/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                setCurrentUser(result.user);
+            } catch (e) {
+                error.textContent = e.message;
+                error.hidden = false;
+            } finally {
+                submit.disabled = false;
+                submit.textContent = signup ? 'Create account' : 'Sign in';
+            }
+        }
+
+        async function signOut() {
+            try {
+                await api('/api/auth/logout', { method: 'POST' });
+                currentUser = null;
+                document.getElementById('user-controls').hidden = true;
+                document.getElementById('user-name').textContent = '';
+                document.getElementById('user-avatar').textContent = 'EW';
+                showAuth();
+            } catch (e) {
+                console.error('Could not sign out', e);
+                window.alert(e.message);
+            }
+        }
+
+        async function initializeApp() {
+            if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('-ml-64');
+            try {
+                const result = await api('/api/auth/me');
+                if (result.user) setCurrentUser(result.user);
+                else showAuth();
+            } catch (e) {
+                console.error('Could not check the current sign-in session', e);
+                showAuth('Unable to connect to the server. Please refresh and try again.');
+            }
+        }
 
         function animateValue(id, start, end, duration, isFloat=false) {
             let obj = document.getElementById(id);
@@ -596,10 +743,7 @@
             document.getElementById('live-wattage').innerText = Math.floor(w);
         }, 3000);
 
-        window.onload = () => {
-            updateOverview();
-            if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-ml-64');
-        };
+        window.onload = initializeApp;
     </script>
 </body>
 </html>

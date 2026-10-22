@@ -1,173 +1,605 @@
-<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EcoWatt AI</title><link rel="icon" href="/static/logo.svg">
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<style>
-:root{--g:#0B4F3C;--g2:#3E9B73;--g3:#9BD3B5;--bg:#F5FAF7;--line:#D5E5DC;--ink:#14261F;--mute:#5B7168;--red:#B3261E;--amb:#B8901A}
-*{box-sizing:border-box}body{margin:0;font-family:'Instrument Sans',sans-serif;color:var(--ink);background:var(--bg);display:flex;min-height:100vh}
-aside{width:248px;background:var(--g);color:#E8F3EC;padding:20px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;flex-shrink:0}
-aside img{width:170px;margin:0 8px 24px}aside h6{margin:18px 12px 6px;font-size:.75rem;font-weight:600;color:var(--g3)}
-aside a{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;color:#E8F3EC;text-decoration:none;font-weight:500;margin:2px 0}
-aside a:hover{background:rgba(255,255,255,.1)}aside a.on{background:#fff;color:var(--g);font-weight:700}aside svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.foot{margin-top:auto;font-size:.78rem;padding:0 12px;color:var(--g3)}
-main{flex:1;padding:28px 36px;min-width:0;max-width:1280px}
-h1{font-size:1.9rem;margin:0 0 4px;color:var(--g);letter-spacing:-.02em}h2{font-size:1.1rem;color:var(--g);margin:28px 0 10px}.sub{color:var(--mute);margin:0 0 20px}
-.grid{display:grid;gap:14px}.k4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.c2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
-.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px}.card .l{color:var(--mute);font-size:.85rem}.card .v{font-size:1.7rem;font-weight:700;color:var(--g);margin-top:2px}.card .d{font-size:.82rem;color:var(--mute)}
-.hero{background:var(--g);color:#fff;border-radius:12px;padding:26px 28px;margin-bottom:16px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
-.hero b{font-size:2.4rem;letter-spacing:-.02em;display:block}.hero span{color:var(--g3)}.bar{height:8px;background:rgba(255,255,255,.2);border-radius:4px;margin-top:10px;width:280px;max-width:100%}.bar i{display:block;height:100%;background:var(--g3);border-radius:4px}
-.btn{background:var(--g);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}.btn:hover{background:#09402F}.btn.alt{background:#fff;color:var(--g);border:1px solid var(--line)}
-.alert{border-left:4px solid;background:#fff;padding:12px 16px;margin:8px 0;border-radius:0 8px 8px 0;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
-.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.78rem;font-weight:700;color:#fff}
-.abnormal{background:var(--red)}.high{background:var(--amb)}.normal{background:var(--g2)}.insufficient{background:#888}
-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.9rem}th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}th{background:#EAF4EE;color:var(--g)}
-.scroll{overflow-x:auto;max-height:420px;overflow-y:auto}select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
-.chat{max-width:760px}.msgs{display:flex;flex-direction:column;gap:10px;min-height:240px;margin-bottom:12px}.m{padding:10px 14px;border-radius:12px;max-width:85%;line-height:1.5}.m.u{align-self:flex-end;background:var(--g);color:#fff}.m.a{background:#fff;border:1px solid var(--line)}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.chip{border:1px solid var(--g3);background:#fff;color:var(--g);padding:6px 12px;border-radius:99px;cursor:pointer;font:inherit;font-size:.85rem}.chip:hover{background:#EAF4EE}
-.row{display:flex;gap:8px}.row input{flex:1}.sl{margin:12px 0}.sl label{display:flex;justify-content:space-between;font-weight:600}input[type=range]{width:100%;accent-color:var(--g)}
-.big{font-size:1.6rem;font-weight:600;color:var(--g);line-height:1.4;max-width:46rem;margin:0 0 6px}
-@media(max-width:820px){body{flex-direction:column}aside{width:100%;height:auto;position:sticky;z-index:5;flex-direction:row;overflow-x:auto;padding:8px;gap:4px;align-items:center}aside img,aside h6,.foot{display:none}aside a{white-space:nowrap}main{padding:18px 14px}}
-.prof{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;margin:0 0 6px}
-.av{width:34px;height:34px;border-radius:50%;background:var(--g3);color:var(--g);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
-.prof b{display:block;font-size:.9rem}.prof small{color:var(--g3);font-size:.75rem}
-#rs{width:100%;margin:0 0 4px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);padding:7px 8px;font-size:.85rem}#rs option{color:#14261F}
-#nav{display:contents}
-#ov{position:fixed;inset:0;background:rgba(11,79,60,.94);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}#ov.on{display:flex}
-.pick{background:#fff;border-radius:14px;padding:28px;max-width:680px;width:100%}.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px}
-.opt{border:2px solid var(--line);background:#fff;border-radius:12px;padding:18px;text-align:left;font:inherit;cursor:pointer}.opt:hover{border-color:var(--g2);background:#F5FAF7}.opt b{display:block;color:var(--g);font-size:1.1rem;margin-bottom:4px}.opt span{color:var(--mute);font-size:.88rem}
-@media(max-width:820px){.prof{display:none}#rs{width:auto}}
-.authbox{background:#fff;border-radius:14px;padding:30px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.18)}
-.authbox h1{margin-bottom:8px}.authbox .sub{margin-bottom:22px}
-.google-auth{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px}
-.auth-divider{display:flex;align-items:center;gap:10px;width:100%;color:var(--mute);font-size:.85rem}
-.auth-divider:before,.auth-divider:after{content:"";height:1px;background:var(--line);flex:1}
-.google-error{color:var(--red);font-size:.9rem}
-.authform label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 5px}
-.authform input{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
-.authform .btn{width:100%;margin-top:18px}
-.autherror{color:var(--red);font-size:.9rem;margin-top:12px}.authback{margin-top:14px;text-align:center}
-.authback button{border:0;background:none;color:var(--g);text-decoration:underline;cursor:pointer;font:inherit}
-</style></head><body>
-<aside><img src="/static/logo.svg" alt="EcoWatt AI"><div id="prof"></div><div id="nav"></div><div class="foot" id="src"></div></aside>
-<main id="view"></main><div id="ov"></div>
-<script>
-const $=s=>document.querySelector(s),api=(u,o)=>fetch(u,o).then(async r=>{if(!r.ok){let m=`Request failed (${r.status})`;try{m=(await r.json()).detail||m}catch{}throw Error(m)}return r.json()});
-const fmt=(n,d=0)=>n==null?'-':Number(n).toLocaleString('en-MY',{minimumFractionDigits:d,maximumFractionDigits:d}),rm=n=>'RM '+fmt(n,2);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
-const PAL=['#0B4F3C','#3E9B73','#9BD3B5','#C9A227'],COL={abnormal:'#B3261E',high:'#B8901A'};
-const IC={dash:'<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',plug:'<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a6 6 0 0 1-12 0V8z"/>',bot:'<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4M8 14h.01M16 14h.01"/>',sav:'<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2zM2 9v1"/>',eco:'<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10zM2 21c0-3 1.9-5.5 6-7"/>'};
-const RESIDENT={home:'overview',groups:['','Monitor','Decide']};
-const ROUTES=[['overview','Overview','dash',1],['monthly','Monthly report','cal',1],['appliances','Appliances','plug',1],['advisor','AI advisor','bot',2],['simulator','Savings simulator','sav',2],['sustainability','Sustainability','eco',2]];
-let ROLE=null,USER=null,GOOGLE_CLIENT_ID='',GOOGLE_LOAD_ERROR='',googleScript;
-function buildNav(){$('#prof').innerHTML=`<div class="prof"><div class="av">${esc(USER.name[0].toUpperCase())}</div><div><b>${esc(USER.name)}</b><small>Resident</small></div></div><button class="btn alt" id="signout" style="width:100%;margin-bottom:12px">Sign out</button>`;$('#signout').onclick=signOut;
- $('#nav').innerHTML=[1,2].map(g=>`<h6>${RESIDENT.groups[g]}</h6>`+ROUTES.filter(r=>r[3]==g).map(([id,t,ic])=>`<a href="#/${id}" data-r="${id}"><svg viewBox="0 0 24 24">${IC[ic]}</svg>${t}</a>`).join('')).join('')}
-function authScreen(mode='welcome',message=''){
- const title=mode==='signup'?'Create your account':'Sign in';
- const form=mode==='signin'||mode==='signup';
- $('#ov').innerHTML=`<div class="authbox">${form?`<h1>${title}</h1><p class="sub">Resident access to EcoWatt AI.</p>
- <form class="authform" id="authform">${mode==='signup'?'<label for="auth-name">Name</label><input id="auth-name" name="name" maxlength="80" autocomplete="name" required>':''}
- <label for="auth-email">Email</label><input id="auth-email" name="email" type="email" maxlength="254" autocomplete="email" required>
- <label for="auth-password">Password</label><input id="auth-password" name="password" type="password" minlength="12" maxlength="128" autocomplete="${mode==='signup'?'new-password':'current-password'}" required>
- ${mode==='signup'?'<small class="d">Use at least 12 characters.</small>':''}<button class="btn" type="submit">${title}</button><div class="autherror" id="autherror" role="alert">${esc(message)}</div></form>
- <div class="authback">${mode==='signup'?`Already registered? <button onclick="authScreen('signin')">Sign in</button>`:`New to EcoWatt? <button onclick="authScreen('signup')">Create an account</button>`}</div>
- ${googlePanel()}`:
- `<h1>Welcome to EcoWatt AI</h1><p class="sub">Sign in or create a resident account to continue.</p><button class="btn" onclick="authScreen('signin')">Resident sign in</button><button class="btn alt" style="margin-left:8px" onclick="authScreen('signup')">Create account</button>${googlePanel()}`}</div>`;
- $('#ov').classList.add('on');
- renderGoogleButton();
- const formEl=$('#authform');
- if(formEl)formEl.onsubmit=async e=>{
-   e.preventDefault();
-   const values=Object.fromEntries(new FormData(formEl));
-   const signup=mode==='signup';
-   const payload={email:values.email,password:values.password};
-   if(signup){payload.name=values.name}
-   const button=formEl.querySelector('button[type=submit]');
-   button.disabled=true;button.textContent=signup?'Creating account...':'Signing in...';
-   try{
-     const result=await api(`/api/auth/${signup?'signup':'login'}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-     finishLogin(result);
-   }catch(error){
-     $('#autherror').textContent=error.message;
-     button.disabled=false;button.textContent=title;
-   }
- };
-}
-function googlePanel(){return GOOGLE_CLIENT_ID?`<div class="google-auth"><div class="auth-divider">or continue with</div><div id="google-button"></div><div id="google-error" class="google-error" role="alert">${esc(GOOGLE_LOAD_ERROR)}</div></div>`:'<p class="d" style="margin-top:18px">Google sign-in is not configured yet. You can still use email and password.</p>'}
-function finishLogin(result){USER=result.user;ROLE=USER.role;buildNav();$('#ov').classList.remove('on');const home='#/'+RESIDENT.home;if(location.hash===home)route();else location.hash=home}
-async function renderGoogleButton(){const target=$('#google-button');if(!target||!GOOGLE_CLIENT_ID||!window.google?.accounts?.id)return;target.innerHTML='';try{const {nonce}=await api('/api/auth/google/nonce',{method:'POST'});if(!target.isConnected)return;google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,nonce,callback:r=>googleCredential(r,nonce)});google.accounts.id.renderButton(target,{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',width:280})}catch(e){const error=$('#google-error');if(error)error.textContent=e.message}}
-async function googleCredential(response,nonce){const error=$('#google-error');if(!response.credential){if(error)error.textContent='Google did not return a sign-in credential.';return}try{const result=await api('/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential,nonce})});finishLogin(result)}catch(e){if(error)error.textContent=e.message}}
-function loadGoogleScript(){if(!GOOGLE_CLIENT_ID||window.google?.accounts?.id)return Promise.resolve();if(!googleScript)googleScript=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=()=>window.google?.accounts?.id?resolve():reject(Error('Google sign-in did not initialize.'));script.onerror=()=>reject(Error('Could not load Google sign-in. Check your internet connection.'));document.head.appendChild(script)});return googleScript}
-async function signOut(){
- try{await api('/api/auth/logout',{method:'POST'})}catch(error){const button=$('#signout');button.textContent=`Could not sign out: ${error.message}`;return}
- USER=null;ROLE=null;$('#nav').innerHTML='';$('#prof').innerHTML='';location.hash='';authScreen('welcome');
-}
-const L=(x={})=>({margin:{l:44,r:10,t:10,b:36},font:{family:'Instrument Sans'},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',legend:{orientation:'h',y:-.2},...x});
-const plot=(id,d,x)=>Plotly.newPlot(id,d,L(x),{displayModeBar:false,responsive:true});
-const kpi=(l,v,d='')=>`<div class="card"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
-const stack=(dates,s,type='bar')=>Object.keys(s).map((k,i)=>({x:dates,y:s[k],name:k,type,marker:{color:PAL[i%4]},...(type=='scatter'?{stackgroup:'a',line:{width:0},fillcolor:PAL[i%4]}:{})}));
-const V=h=>$('#view').innerHTML=h;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoWatt AI - Smart Energy Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 800: '#166534', 900: '#0B4F3C' }
+                    },
+                    boxShadow: { 'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #0f172a; overflow-x: hidden; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05); }
+        .nav-item { transition: all 0.2s ease-in-out; cursor: pointer; }
+        .nav-item.active { background-color: #166534; color: white; border-radius: 0.75rem; }
+        .nav-item:not(.active):hover { background-color: rgba(255,255,255,0.1); border-radius: 0.75rem; }
+        .view-section { display: none; animation: fadeIn 0.4s ease-out forwards; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: pulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1); }
+        @keyframes pulse { to { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-800">
 
-const pages={
-async overview(){const o=await api('/api/overview');$('#src').textContent=o.simulated?'Readings are simulated':'Live sensor data';
- V(`<h1>Overview</h1><p class="sub">${o.month}, day ${o.day} of ${o.days}</p>
- <div class="hero"><div><span>Estimated bill so far</span><b>${rm(o.bill)}</b><span>${fmt(o.kwh)} kWh used</span><div class="bar"><i style="width:${o.day/o.days*100}%"></i></div></div>
- <div><span>Projected month-end</span><b>${rm(o.proj_bill)}</b><span>${fmt(o.proj_kwh)} kWh at the current pace</span></div></div>
- <div class="grid k4">${kpi('Potential savings',rm(o.savings)+'/mo','if flagged issues are fixed')}${kpi('Alerts',o.alerts.length,o.alerts.length?'need attention':'all normal')}${kpi('Top appliance',Object.entries(o.by_appliance).sort((a,b)=>b[1]-a[1])[0][0],'this month')}</div>
- <div class="grid c2"><div><h2>Where the energy goes</h2><div class="card"><div id="p1"></div></div></div><div><h2>Last 30 days</h2><div class="card"><div id="p2"></div></div></div></div>
- <h2>Alerts and next steps</h2>${o.alerts.length?o.alerts.map(a=>`<div class="alert" style="border-left-color:${COL[a.status]}"><b>${a.appliance}</b> <span class="pill ${a.status}">${a.status}</span><p>${esc(a.why)}</p><p><b>Next:</b> ${esc(a.rec)} Possible saving: <b>${rm(a.rm)}</b>/month.</p><button class="btn alt" onclick="ask('Why is my ${a.appliance.toLowerCase()} flagged and what should I do?')">Ask the advisor</button></div>`).join(''):'<div class="card">No unusual consumption detected.</div>'}`);
- plot('p1',[{type:'pie',hole:.55,labels:Object.keys(o.by_appliance),values:Object.values(o.by_appliance),marker:{colors:PAL},textinfo:'percent'}],{height:300});
- plot('p2',stack(o.trend.dates,o.trend.series,'scatter'),{height:300,yaxis:{title:'kWh'}})},
+    <!-- Sidebar -->
+    <aside class="w-64 bg-brand-900 text-white flex flex-col h-full z-20 flex-shrink-0 transition-all duration-300 shadow-xl relative" id="sidebar">
+        <div class="p-6 pb-2 flex items-center gap-3">
+            <div class="bg-brand-500 text-white p-2 rounded-lg"><i class="ph-fill ph-leaf text-2xl"></i></div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">EcoWatt AI</h1>
+                <p class="text-xs text-brand-100 opacity-80">Smart Energy Management</p>
+            </div>
+        </div>
+        
+        <div class="px-6 py-4 mt-4 flex-1 space-y-1 overflow-y-auto">
+            <div class="text-xs font-semibold text-brand-100 opacity-60 uppercase tracking-wider mb-2 mt-4">Menu</div>
+            <div class="nav-item active flex items-center gap-3 px-4 py-3" onclick="switchTab('overview')">
+                <i class="ph ph-squares-four text-lg"></i> <span class="font-medium">Overview</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('monthly')">
+                <i class="ph ph-chart-bar text-lg"></i> <span class="font-medium">Monthly Report</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('appliances')">
+                <i class="ph ph-plug text-lg"></i> <span class="font-medium">Appliances</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('advisor')">
+                <i class="ph ph-magic-wand text-lg"></i> <span class="font-medium">AI Advisor</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('simulator')">
+                <i class="ph ph-sliders-horizontal text-lg"></i> <span class="font-medium">Savings Simulator</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('sustainability')">
+                <i class="ph ph-tree text-lg"></i> <span class="font-medium">Sustainability</span>
+            </div>
+        </div>
 
-async monthly(){const ms=await api('/api/months');V(`<h1>Monthly electricity report</h1><p class="sub">Choose a month to see the full picture.</p><select id="ms">${ms.map(m=>`<option>${m}</option>`).join('')}</select><div id="mb"></div>`);
- const load=async()=>{const m=$('#ms').value,d=await api('/api/monthly?month='+m);
- $('#mb').innerHTML=`<div class="grid k4" style="margin-top:14px">${kpi('Total',fmt(d.total,1)+' kWh',d.partial?d.days_recorded+' days so far':'')}${kpi('Estimated bill',rm(d.bill))}${kpi('Daily average',fmt(d.avg,1)+' kWh')}${kpi('Peak day',d.peak_day.slice(5),fmt(d.peak_kwh,1)+' kWh')}${kpi('Top appliance',d.top)}</div>
- <h2>Daily consumption by appliance</h2><div class="card"><div id="m1"></div></div>
- <div class="grid c2"><div><h2>Cumulative bill (RM)</h2><div class="card"><div id="m2"></div></div></div><div><h2>When power is used</h2><div class="card"><div id="m3"></div></div></div></div>
- <h2>What your bill is made of</h2><table><tr><th>Charge</th><th>Amount (RM)</th></tr>${d.breakdown.map(r=>`<tr><td>${r.Charge}</td><td>${fmt(r['Amount (RM)'],2)}</td></tr>`).join('')}</table><p class="sub">Estimate based on the TNB domestic tariff. Your actual bill may differ.</p>
- <h2>Daily table</h2><button class="btn alt" id="csv">Download CSV</button><div class="scroll" style="margin-top:8px"><table><tr><th>Date</th>${Object.keys(d.series).map(k=>`<th>${k}</th>`).join('')}<th>Total kWh</th></tr>${d.table.map(r=>`<tr><td>${r.date}</td>${Object.keys(d.series).map(k=>`<td>${r[k]}</td>`).join('')}<td><b>${r.total}</b></td></tr>`).join('')}</table></div>`;
- plot('m1',stack(d.dates,d.series),{barmode:'stack',height:320,yaxis:{title:'kWh'}});plot('m2',[{x:d.dates,y:d.cum_rm,type:'scatter',fill:'tozeroy',line:{color:'#0B4F3C'},fillcolor:'rgba(155,211,181,.4)'}],{height:300});
- plot('m3',[{type:'heatmap',x:d.heat.x,y:d.heat.y,z:d.heat.z,colorscale:'Greens',colorbar:{title:'kWh'}}],{height:300,yaxis:{title:'Hour'}});
- $('#csv').onclick=()=>{const k=Object.keys(d.series),t=['date,'+k.join(',')+',total',...d.table.map(r=>[r.date,...k.map(c=>r[c]),r.total].join(','))].join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download=`ecowatt_${m}.csv`;a.click()}};
- $('#ms').onchange=load;load()},
+        <div class="p-6 border-t border-white/10">
+            <div class="bg-white/10 rounded-xl p-4 flex items-center gap-3">
+                <div class="pulse-dot"></div>
+                <div>
+                    <div class="text-xs text-brand-100" id="data-source-label">Live Status</div>
+                    <div class="text-sm font-bold tracking-wide"><span id="live-wattage">--</span> W</div>
+                </div>
+            </div>
+        </div>
+    </aside>
 
-async appliances(){const [A,acts]=await Promise.all([api('/api/appliances'),api('/api/actions')]);
- V(`<h1>Appliance monitoring</h1><p class="sub">Each appliance is compared with its own baseline.</p><div class="grid c2">${A.map((a,i)=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:1.1rem">${a.name}</b><div class="d">${a.room}, rated ${a.rated_w} W</div></div><span class="pill ${a.status.split(' ')[0]}">${a.status}</span></div>
- <div class="grid" style="grid-template-columns:repeat(3,1fr);margin:12px 0"><div><div class="d">Latest power</div><b>${fmt(a.power_w)} W</b></div><div><div class="d">This month</div><b>${fmt(a.month_kwh,1)} kWh</b></div><div><div class="d">Last 7 days</div><b>${fmt(a.recent,2)}</b> kWh/day ${a.pct!=null?`<span style="color:${a.pct>.15?'#B3261E':'#3E9B73'}">${a.pct>0?'+':''}${fmt(a.pct*100)}%</span>`:''}</div></div>
- <div id="a${i}"></div><p>${esc(a.why)}</p>${a.status=='abnormal'||a.status=='high'?`<p><b>Suggested checks:</b> ${esc(a.rec)}<br><b>Possible saving:</b> ${rm(a.extra_rm)}/month</p>`:''}
- <div class="row"><input type="text" id="n${i}" placeholder="Record an action, e.g. cleaned the filter"><button class="btn" onclick="act(${i},'${a.name}')">Save</button></div></div>`).join('')}</div>
- <h2>Action log and review</h2>${acts.length?acts.map(x=>`<div class="card" style="margin-bottom:8px"><b>${x.ts.replace('T',' ')}</b> ${x.appliance}: ${esc(x.note)}<div class="d">${x.days_after?`Average ${fmt(x.before,2)} to ${fmt(x.after,2)} kWh/day over ${x.days_after} day(s)`:`Baseline ${fmt(x.before,2)} kWh/day; no readings after the action yet`}</div></div>`).join(''):'<div class="card">Actions you record appear here with a before and after comparison.</div>'}`);
- A.forEach((a,i)=>plot('a'+i,[{x:a.dates,y:a.kwh,type:'bar',marker:{color:'#0B4F3C'},name:'kWh'}],{height:200,showlegend:false,shapes:a.baseline!=null?[{type:'line',xref:'paper',x0:0,x1:1,y0:a.baseline,y1:a.baseline,line:{dash:'dash',color:'#B8901A'}}]:[]}))},
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
+        <!-- Header -->
+        <header class="glass-panel px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-slate-500 hover:text-slate-800" onclick="toggleSidebar()">
+                    <i class="ph ph-list text-2xl"></i>
+                </button>
+                <h2 class="text-2xl font-bold text-slate-800 tracking-tight" id="page-title">Dashboard Overview</h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full font-medium">
+                    <i class="ph ph-calendar-blank mr-1 inline-block align-text-top"></i>
+                    <span id="current-date-display">Loading...</span>
+                </div>
+                <div class="h-10 w-10 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-bold border-2 border-white shadow-sm">
+                    UT
+                </div>
+            </div>
+        </header>
 
-advisor(){V(`<div class="chat"><h1>AI energy advisor</h1><p class="sub">Python does the calculations. The AI explains them.</p><div class="chips">${['My electricity usage increased this month. Which appliance should I investigate first?','I want to add an EV charger for my Tesla. How much would that increase my bill?','How can I lower my bill by RM 30?'].map(q=>`<button class="chip" onclick="ask(this.textContent,1)">${q}</button>`).join('')}</div><div class="msgs" id="msgs"></div><div class="row"><input type="text" id="q" placeholder="Ask about your bill, an appliance or a new purchase"><button class="btn" onclick="ask()">Send</button></div></div>`);
- $('#q').onkeydown=e=>{if(e.key=='Enter')ask()};(window.hist||[]).forEach(([r,t])=>bub(r,t))},
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 w-full max-w-7xl mx-auto">
+            
+            <!-- OVERVIEW VIEW -->
+            <div id="view-overview" class="view-section active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Used This Month</p>
+                                <h3 class="text-3xl font-bold text-slate-800 mt-1"><span id="kpi-used">0</span> <span class="text-lg text-slate-400 font-medium">kWh</span></h3>
+                            </div>
+                            <div class="p-2 bg-blue-50 text-blue-500 rounded-lg"><i class="ph-fill ph-lightning text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Est. Bill So Far</p>
+                                <h3 class="text-3xl font-bold text-slate-800 mt-1">RM <span id="kpi-bill">0.00</span></h3>
+                            </div>
+                            <div class="p-2 bg-emerald-50 text-emerald-500 rounded-lg"><i class="ph-fill ph-wallet text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 w-24 h-24 bg-brand-50 rounded-full opacity-50"></div>
+                        <div class="flex justify-between items-start relative z-10">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Projected Month-End</p>
+                                <h3 class="text-3xl font-bold text-brand-600 mt-1">RM <span id="kpi-proj-bill">0.00</span></h3>
+                                <p class="text-xs text-slate-400 mt-1 font-medium"><span id="kpi-proj-kwh">0</span> kWh expected</p>
+                            </div>
+                            <div class="p-2 bg-brand-100 text-brand-600 rounded-lg"><i class="ph-fill ph-trend-up text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-brand-800 to-brand-900 rounded-2xl p-6 shadow-soft text-white flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-brand-100">Potential Savings</p>
+                                <h3 class="text-3xl font-bold mt-1 text-white">RM <span id="kpi-savings">0.00</span></h3>
+                                <p class="text-xs text-brand-200 mt-1">/ month with optimizations</p>
+                            </div>
+                            <div class="p-2 bg-white/20 rounded-lg"><i class="ph-fill ph-piggy-bank text-xl"></i></div>
+                        </div>
+                    </div>
+                </div>
 
-async simulator(){V(`<h1>Savings simulator</h1><p class="sub">Try changes and see the effect on your monthly bill.</p><div class="grid c2"><div class="card">
- ${[['hours','Cut AC running hours per day',0,4,.5,1,' h'],['setpoint','Raise AC setpoint',0,4,1,1,' C'],['heater','Shorten water-heater use',0,50,5,20,'%']].map(([id,l,a,b,s,v,u])=>`<div class="sl"><label>${l}<span id="${id}v">${v}${u}</span></label><input type="range" id="${id}" min="${a}" max="${b}" step="${s}" value="${v}" data-u="${u}"></div>`).join('')}<p class="d">Assumes about 6% less AC energy per 1 C higher setpoint, based on your last 7 days.</p></div>
- <div class="card"><div class="l">Estimated saving</div><div class="v" id="tot"></div><div class="d" id="totk"></div><div id="s2"></div></div></div><h2>Ranked by saving</h2><div class="card"><div id="s1"></div></div>`);
- let t;const run=async()=>{const q=['hours','setpoint','heater'].map(i=>{const e=$('#'+i);$('#'+i+'v').textContent=e.value+e.dataset.u;return i+'='+e.value}).join('&'),d=await api('/api/simulate?'+q);
- $('#tot').textContent=rm(d.total_rm)+'/month';$('#totk').textContent=fmt(d.total_kwh)+' kWh less each month';const it=[...d.items].sort((a,b)=>a.rm-b.rm);
- plot('s1',[{type:'bar',orientation:'h',x:it.map(i=>i.rm),y:it.map(i=>i.action),marker:{color:'#0B4F3C'}}],{height:220,xaxis:{title:'RM per month'},margin:{l:150,r:10,t:10,b:40}});
- plot('s2',[{type:'bar',x:['Current pace','With changes'],y:[d.bill_now,d.bill_after],marker:{color:['#9BD3B5','#0B4F3C']}}],{height:220,yaxis:{title:'Projected bill (RM)'}})};
- document.querySelectorAll('input[type=range]').forEach(e=>e.oninput=()=>{clearTimeout(t);t=setTimeout(run,150)});run()},
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 lg:col-span-2">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Last 30 Days Trend</h3>
+                        <div id="chart-area" class="w-full h-[300px]"></div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Where Energy Goes</h3>
+                        <div id="chart-donut" class="w-full h-[300px] flex items-center justify-center"></div>
+                    </div>
+                </div>
 
-async sustainability(){const s=await api('/api/sustainability');V(`<h1>Your impact on the planet</h1><p class="big">By the end of this month your home will have caused about ${fmt(s.kg)} kg of CO2, like driving a petrol car around ${fmt(s.km)} km.</p><p class="sub">Most of Malaysia's electricity still comes from burning fuel, which releases CO2. Using less power means less CO2.</p>
- <div class="grid k4">${kpi('Compared with last month',(s.change>0?'+':'')+fmt((s.change||0)*100)+'%',s.change>0?'Higher than last month':'Lower than last month')}${kpi('Trees to absorb it',fmt(s.trees),'growing for one year')}${kpi('Car distance equivalent',fmt(s.km)+' km','in a petrol car')}</div>
- <h2>Easy ways to cut it</h2>${s.wins.length?s.wins.map(w=>`<div class="alert" style="border-left-color:#3E9B73"><b>${w.appliance}</b>: ${esc(w.rec)}<br>Could save about <b>${rm(w.rm)}</b> and <b>${fmt(w.kg)} kg of CO2</b> each month.</div>`).join(''):'<div class="card">Nothing is using unusual energy right now. Keep it up.</div>'}
- <h2>Month by month</h2><div class="card"><div id="e1"></div></div><p class="sub">The oldest and newest months may be partial.</p>
- <details class="card"><summary><b>How we work this out</b></summary><p>CO2 = kWh used x ${s.ef} kg per kWh, an estimate of the CO2 the grid releases per unit. A petrol car emits roughly 0.17 kg per km and a tree absorbs roughly 21 kg a year. These are rounded everyday figures, not exact measurements.</p></details>`);
- plot('e1',[{type:'bar',x:s.months,y:s.month_kg,marker:{color:'#0B4F3C'}}],{height:260,yaxis:{title:'kg of CO2'}})}};
+                <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-bell-ringing text-amber-500"></i> Alerts & Insights
+                    </h3>
+                    <div id="alerts-container" class="space-y-3">
+                        <p class="text-slate-500 text-sm">Loading alerts...</p>
+                    </div>
+                </div>
+            </div>
 
-window.hist=window.hist||[];
-function bub(r,t){const m=$('#msgs');if(!m)return;m.insertAdjacentHTML('beforeend',`<div class="m ${r=='u'?'u':'a'}">${md(t)}</div>`);m.scrollTop=m.scrollHeight}
-async function ask(q,stay){if(!q){q=($('#q')||{}).value;if(!q||!q.trim())return}if(!$('#msgs')){location.hash='#/advisor';await new Promise(r=>setTimeout(r,250))}
- const inp=$('#q');if(inp)inp.value='';hist.push(['u',q]);bub('u',q);bub('a','Thinking...');
- try{const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});hist.push(['a',r.answer]);$('#msgs').lastChild.innerHTML=md(r.answer)}catch(e){$('#msgs').lastChild.textContent='Sorry, the advisor is unavailable. Please try again.'}}
-async function act(i,name){const el=$('#n'+i);if(!el.value.trim())return;await api('/api/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appliance:name,note:el.value})});route()}
-async function route(){if(!ROLE){authScreen('welcome');return}let id=location.hash.replace('#/','')||RESIDENT.home;const rt=ROUTES.find(r=>r[0]==id);if(!rt){id=RESIDENT.home;history.replaceState(null,'','#/'+id)}if(!$('#nav a'))buildNav();const p=pages[id];document.querySelectorAll('aside a').forEach(a=>a.classList.toggle('on',a.dataset.r==id));
- try{await p();window.scrollTo(0,0)}catch(e){V('<div class="card">Could not load this page. Is the server running?</div>')}}
-addEventListener('hashchange',route);
-async function start(){try{const [session,config]=await Promise.all([api('/api/auth/me'),api('/api/auth/config')]);USER=session.user;GOOGLE_CLIENT_ID=config.google_client_id||'';ROLE=USER?.role==='resident'?'resident':null}catch{USER=null;ROLE=null}if(GOOGLE_CLIENT_ID){try{await loadGoogleScript()}catch(e){console.error(e);GOOGLE_LOAD_ERROR=e.message}}if(USER){buildNav();if(!location.hash)location.hash='#/'+RESIDENT.home;else route()}else authScreen('welcome')}
-start();
-</script></body></html>
+            <!-- MONTHLY REPORT VIEW -->
+            <div id="view-monthly" class="view-section space-y-6">
+                <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-slate-800">Daily Consumption</h3>
+                        <select id="month-selector" onchange="loadMonthlyData()" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-500 outline-none font-medium p-2.5"></select>
+                    </div>
+                    <div id="chart-bar-stacked" class="w-full h-[350px]"></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Cumulative Bill (RM)</h3>
+                        <div id="chart-cumulative" class="w-full h-[250px]"></div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Usage Time Heatmap</h3>
+                        <div id="chart-heatmap" class="w-full h-[250px]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- APPLIANCES VIEW -->
+            <div id="view-appliances" class="view-section space-y-6">
+                <p class="text-slate-500 mb-4">Detailed monitoring and anomaly detection for registered appliances.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="appliances-grid">
+                    <p class="text-slate-500 text-sm">Loading appliances...</p>
+                </div>
+            </div>
+
+            <!-- AI ADVISOR VIEW -->
+            <div id="view-advisor" class="view-section" style="height: calc(100vh - 180px);">
+                <div class="bg-white rounded-2xl shadow-soft border border-slate-100 flex flex-col h-full overflow-hidden">
+                    <div class="p-4 bg-brand-50 border-b border-brand-100 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-brand-500 rounded-full flex items-center justify-center text-white shadow-md">
+                            <i class="ph-fill ph-robot text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-brand-900">EcoWatt AI Assistant</h3>
+                            <p class="text-xs text-brand-600 font-medium">Powered by Gemini & Python Analytics</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" id="chat-box">
+                        <div class="flex gap-4 max-w-[80%]">
+                            <div class="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center flex-shrink-0 text-brand-700">
+                                <i class="ph-fill ph-robot"></i>
+                            </div>
+                            <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 text-slate-700 text-sm">
+                                Hello! I'm synced with your FastAPI server. Ask me anything about your energy usage, appliances, or how to lower your TNB bill!
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-white border-t border-slate-100">
+                        <form onsubmit="handleChat(event)" class="flex gap-2">
+                            <input type="text" id="chat-input" placeholder="E.g., Why is my bill so high this month?" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-500 focus:ring-1 transition-colors">
+                            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-3 rounded-xl transition-colors font-medium flex items-center gap-2">
+                                Send <i class="ph-bold ph-paper-plane-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SAVINGS SIMULATOR VIEW -->
+            <div id="view-simulator" class="view-section space-y-6">
+                <div class="bg-gradient-to-br from-brand-900 to-brand-800 rounded-2xl p-8 shadow-lg text-white mb-6">
+                    <h2 class="text-2xl font-bold mb-2">Optimize & Save</h2>
+                    <p class="text-brand-100 opacity-90 max-w-2xl text-sm leading-relaxed">Adjust your habits using the sliders below to see immediate projected impacts on your next bill based on your actual data.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-5 space-y-4">
+                        <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                            <label class="flex justify-between text-sm font-bold text-slate-700 mb-4">
+                                <span>Cut AC hours/day</span>
+                                <span class="text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md" id="val-ac-hrs">-1.0 hr</span>
+                            </label>
+                            <input type="range" id="sim-hours" min="0" max="4" step="0.5" value="1.0" class="w-full accent-brand-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer" oninput="updateSim()">
+                        </div>
+                        <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                            <label class="flex justify-between text-sm font-bold text-slate-700 mb-4">
+                                <span>Raise AC Setpoint (°C)</span>
+                                <span class="text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md" id="val-ac-temp">+1 °C</span>
+                            </label>
+                            <input type="range" id="sim-setpoint" min="0" max="4" step="1" value="1" class="w-full accent-brand-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer" oninput="updateSim()">
+                        </div>
+                        <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                            <label class="flex justify-between text-sm font-bold text-slate-700 mb-4">
+                                <span>Shorten Water Heater use</span>
+                                <span class="text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md" id="val-wh-use">-20%</span>
+                            </label>
+                            <input type="range" id="sim-heater" min="0" max="50" step="5" value="20" class="w-full accent-brand-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer" oninput="updateSim()">
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col justify-center">
+                        <div class="text-center mb-8">
+                            <p class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Estimated Monthly Impact</p>
+                            <div class="flex items-center justify-center gap-4">
+                                <div class="text-5xl font-extrabold text-brand-600">-RM <span id="sim-save-rm">0.00</span></div>
+                                <div class="w-px h-12 bg-slate-200"></div>
+                                <div class="text-2xl font-bold text-slate-400">-<span id="sim-save-kwh">0</span> kWh</div>
+                            </div>
+                        </div>
+                        <div id="chart-sim" class="w-full h-[250px]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUSTAINABILITY VIEW -->
+            <div id="view-sustainability" class="view-section space-y-6">
+                <div class="bg-emerald-900 rounded-2xl p-8 shadow-lg text-white flex justify-between items-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Carbon Footprint</h2>
+                        <p class="text-emerald-100 opacity-90 text-sm">Tracking your home's environmental impact based on the grid emission factor.</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-emerald-200 font-medium">Projected Emissions</p>
+                        <h3 class="text-4xl font-black mt-1"><span id="sus-co2">0</span> <span class="text-xl font-medium opacity-80">kg CO₂e</span></h3>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Emissions Trend</h3>
+                    <div id="chart-sus" class="w-full h-[350px]"></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // API Helper
+        const api = async (path, options) => {
+            const r = await fetch(path, options);
+            if (!r.ok) throw new Error(r.statusText);
+            return r.json();
+        };
+
+        const PALETTE = ["#16a34a", "#0B4F3C", "#f59e0b", "#38bdf8"];
+        const APP_COLORS = { "Air conditioner": "#16a34a", "Refrigerator": "#0B4F3C", "Water heater": "#f59e0b", "Washing machine": "#38bdf8" };
+        let charts = {};
+        let simTimer;
+
+        function animateValue(id, start, end, duration, isFloat=false) {
+            let obj = document.getElementById(id);
+            if(!obj || end == null) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                let val = progress * (end - start) + start;
+                obj.innerHTML = isFloat ? val.toFixed(2) : Math.floor(val);
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        async function updateOverview() {
+            try {
+                const data = await api('/api/overview');
+                document.getElementById('current-date-display').innerText = `${data.month} (Day ${data.day})`;
+                document.getElementById('data-source-label').innerText = data.simulated ? 'Simulated Status' : 'Live Status';
+                
+                animateValue('kpi-used', 0, data.kwh, 1500, false);
+                animateValue('kpi-bill', 0, data.bill, 1500, true);
+                animateValue('kpi-proj-bill', 0, data.proj_bill, 1500, true);
+                animateValue('kpi-proj-kwh', 0, data.proj_kwh, 1500, false);
+                animateValue('kpi-savings', 0, data.savings, 1500, true);
+
+                // Donut Chart
+                const appNames = Object.keys(data.by_appliance);
+                const appVals = Object.values(data.by_appliance);
+                if(charts.donut) charts.donut.destroy();
+                charts.donut = new ApexCharts(document.querySelector("#chart-donut"), {
+                    series: appVals.map(v => Math.round(v)),
+                    labels: appNames,
+                    chart: { type: 'donut', height: 300, fontFamily: 'Plus Jakarta Sans' },
+                    colors: appNames.map(n => APP_COLORS[n] || '#94a3b8'),
+                    stroke: { width: 0 }, dataLabels: { enabled: false },
+                    plotOptions: { pie: { donut: { size: '65%' } } }, legend: { position: 'bottom' }
+                });
+                charts.donut.render();
+
+                // Area Chart
+                const areaSeries = Object.keys(data.trend.series).map(app => ({
+                    name: app, data: data.trend.series[app].map(v => v.toFixed(2))
+                }));
+                if(charts.area) charts.area.destroy();
+                charts.area = new ApexCharts(document.querySelector("#chart-area"), {
+                    series: areaSeries,
+                    chart: { type: 'area', height: 300, stacked: true, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                    colors: Object.keys(data.trend.series).map(n => APP_COLORS[n] || '#94a3b8'),
+                    dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 2 },
+                    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.1, stops: [0, 90, 100] } },
+                    xaxis: { categories: data.trend.dates, type: 'datetime', labels: { format: 'dd MMM' } },
+                    yaxis: { labels: { formatter: (val) => val.toFixed(0) + " kWh" } },
+                    legend: { show: false }
+                });
+                charts.area.render();
+
+                // Alerts
+                const alertHtml = data.alerts.length ? data.alerts.map(a => {
+                    const isAbnormal = a.status === 'abnormal';
+                    return `
+                        <div class="p-4 rounded-xl border ${isAbnormal ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'} flex items-start gap-3">
+                            <i class="ph-fill ph-warning-circle ${isAbnormal ? 'text-rose-500' : 'text-amber-500'} text-xl mt-0.5"></i>
+                            <div>
+                                <h4 class="font-bold ${isAbnormal ? 'text-rose-800' : 'text-amber-800'}">${a.appliance}: ${a.status}</h4>
+                                <p class="text-sm ${isAbnormal ? 'text-rose-600' : 'text-amber-700'} mt-1">${a.why}</p>
+                                <p class="text-xs font-semibold ${isAbnormal ? 'text-rose-700' : 'text-amber-700'} mt-2">Next steps: ${a.rec}</p>
+                            </div>
+                        </div>`;
+                }).join('') : `<div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3"><i class="ph-fill ph-check-circle text-emerald-500 text-xl mt-0.5"></i><div><h4 class="font-bold text-slate-800">All Normal</h4><p class="text-sm text-slate-500 mt-1">No unusual consumption detected.</p></div></div>`;
+                document.getElementById('alerts-container').innerHTML = alertHtml;
+            } catch(e) { console.error(e); }
+        }
+
+        async function initMonthly() {
+            try {
+                const months = await api('/api/months');
+                const sel = document.getElementById('month-selector');
+                sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+                if(months.length) loadMonthlyData();
+            } catch(e) {}
+        }
+
+        async function loadMonthlyData() {
+            const m = document.getElementById('month-selector').value;
+            if(!m) return;
+            try {
+                const data = await api(`/api/monthly?month=${m}`);
+                
+                // Stacked Bar
+                const barSeries = Object.keys(data.series).map(app => ({
+                    name: app, data: data.series[app].map(v => v.toFixed(2))
+                }));
+                if(charts.bar) charts.bar.destroy();
+                charts.bar = new ApexCharts(document.querySelector("#chart-bar-stacked"), {
+                    series: barSeries,
+                    chart: { type: 'bar', height: 350, stacked: true, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                    colors: Object.keys(data.series).map(n => APP_COLORS[n]),
+                    plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories: data.dates, type: 'datetime', labels: { format: 'dd MMM' } },
+                    yaxis: { title: { text: 'kWh' } }, legend: { position: 'top' }
+                });
+                charts.bar.render();
+
+                // Cumulative Line
+                if(charts.cum) charts.cum.destroy();
+                charts.cum = new ApexCharts(document.querySelector("#chart-cumulative"), {
+                    series: [{ name: 'Cumulative Bill (RM)', data: data.cum_rm.map(v => v.toFixed(2)) }],
+                    chart: { type: 'line', height: 250, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                    colors: ['#0B4F3C'], stroke: { curve: 'smooth', width: 3 },
+                    xaxis: { categories: data.dates, type: 'datetime', labels: { format: 'dd MMM' } },
+                    yaxis: { title: { text: 'RM' } }
+                });
+                charts.cum.render();
+
+                // Heatmap
+                const heatSeries = data.heat.y.map((hour, idx) => ({
+                    name: `${hour}:00`, data: data.heat.x.map((date, xIdx) => data.heat.z[idx][xIdx])
+                })).reverse();
+
+                if(charts.heat) charts.heat.destroy();
+                charts.heat = new ApexCharts(document.querySelector("#chart-heatmap"), {
+                    series: heatSeries,
+                    chart: { type: 'heatmap', height: 250, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                    colors: ['#22c55e'], dataLabels: { enabled: false },
+                    xaxis: { categories: data.heat.x, type: 'datetime', labels: { show: false } },
+                    yaxis: { tickAmount: 6, labels: { style: { fontSize: '10px'} } }
+                });
+                charts.heat.render();
+            } catch(e) { console.error(e); }
+        }
+
+        async function updateAppliances() {
+            try {
+                const data = await api('/api/appliances');
+                const html = data.map(app => {
+                    const isAlert = app.status === 'abnormal' || app.status === 'high';
+                    return `
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full" style="background-color: ${APP_COLORS[app.name] || '#ccc'}"></span>
+                                    ${app.name}
+                                </h3>
+                                <p class="text-xs text-slate-500 font-medium">${app.room} • ${app.rated_w}W</p>
+                            </div>
+                            <div class="text-right">
+                                ${isAlert 
+                                    ? `<span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">${app.status}</span>`
+                                    : `<span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Normal</span>`
+                                }
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Latest Power</p>
+                                    <p class="text-xl font-bold text-slate-800">${app.power_w.toFixed(0)} W</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Month to Date</p>
+                                    <p class="text-xl font-bold text-slate-800">${app.month_kwh.toFixed(1)} kWh</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-2">${app.why}</p>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('appliances-grid').innerHTML = html;
+            } catch(e) { console.error(e); }
+        }
+
+        async function updateSim() {
+            clearTimeout(simTimer);
+            simTimer = setTimeout(async () => {
+                const hours = document.getElementById('sim-hours').value;
+                const setp = document.getElementById('sim-setpoint').value;
+                const heat = document.getElementById('sim-heater').value;
+
+                document.getElementById('val-ac-hrs').innerText = `-${parseFloat(hours).toFixed(1)} hr`;
+                document.getElementById('val-ac-temp').innerText = `+${setp} °C`;
+                document.getElementById('val-wh-use').innerText = `-${heat}%`;
+
+                try {
+                    const data = await api(`/api/simulate?hours=${hours}&setpoint=${setp}&heater=${heat}`);
+                    document.getElementById('sim-save-rm').innerText = data.total_rm.toFixed(2);
+                    document.getElementById('sim-save-kwh').innerText = Math.round(data.total_kwh);
+
+                    if(charts.sim) charts.sim.destroy();
+                    charts.sim = new ApexCharts(document.querySelector("#chart-sim"), {
+                        series: [{ name: 'Savings (RM)', data: data.items.map(i => i.rm.toFixed(2)) }],
+                        chart: { type: 'bar', height: 250, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                        colors: ['#22c55e'], plotOptions: { bar: { borderRadius: 4, horizontal: true, dataLabels: { position: 'top' } } },
+                        dataLabels: { enabled: true, offsetX: 30, style: { colors: ['#334155'] } },
+                        xaxis: { categories: data.items.map(i => i.action) }
+                    });
+                    charts.sim.render();
+                } catch(e) { console.error(e); }
+            }, 150);
+        }
+
+        async function updateSustainability() {
+            try {
+                const data = await api('/api/sustainability');
+                animateValue('sus-co2', 0, data.kg, 1500, false);
+                
+                if(charts.sus) charts.sus.destroy();
+                charts.sus = new ApexCharts(document.querySelector("#chart-sus"), {
+                    series: [{ name: 'Emissions (kg CO2e)', data: data.month_kg.map(v => v.toFixed(1)) }],
+                    chart: { type: 'bar', height: 350, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+                    colors: ['#0B4F3C'], plotOptions: { bar: { borderRadius: 4 } },
+                    xaxis: { categories: data.months }, yaxis: { title: { text: 'kg CO₂e' } }
+                });
+                charts.sus.render();
+            } catch(e) { console.error(e); }
+        }
+
+        async function handleChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const val = input.value.trim();
+            if(!val) return;
+
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="flex gap-4 max-w-[80%] self-end ml-auto"><div class="bg-brand-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm text-sm">${val.replace(/</g, "&lt;")}</div></div>`;
+            input.value = '';
+            box.scrollTop = box.scrollHeight;
+
+            box.innerHTML += `<div id="typing-indicator" class="flex gap-4 max-w-[80%]"><div class="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center flex-shrink-0 text-brand-700"><i class="ph-fill ph-robot"></i></div><div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 text-slate-700 text-sm">Thinking...</div></div>`;
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                const res = await api('/api/chat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: val })
+                });
+                document.getElementById('typing-indicator').remove();
+                
+                // Format markdown bold/newlines simply
+                const fmtAns = res.answer.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                box.innerHTML += `<div class="flex gap-4 max-w-[80%]"><div class="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center flex-shrink-0 text-brand-700"><i class="ph-fill ph-robot"></i></div><div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 text-slate-700 text-sm leading-relaxed">${fmtAns}</div></div>`;
+                box.scrollTop = box.scrollHeight;
+            } catch(e) {
+                document.getElementById('typing-indicator').remove();
+                box.innerHTML += `<div class="flex gap-4 max-w-[80%]"><div class="bg-rose-50 text-rose-700 border border-rose-200 p-4 rounded-2xl shadow-sm text-sm">Sorry, the server couldn't be reached.</div></div>`;
+            }
+        }
+
+        // Navigation
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${tabId}`).classList.add('active');
+
+            const titles = { 'overview': 'Dashboard Overview', 'monthly': 'Monthly Report', 'appliances': 'Appliance Monitoring', 'advisor': 'AI Energy Advisor', 'simulator': 'Savings Simulator', 'sustainability': 'Environmental Impact' };
+            document.getElementById('page-title').innerText = titles[tabId];
+
+            if (tabId === 'overview') updateOverview();
+            if (tabId === 'monthly' && !document.getElementById('month-selector').options.length) initMonthly();
+            if (tabId === 'appliances') updateAppliances();
+            if (tabId === 'simulator') updateSim();
+            if (tabId === 'sustainability') updateSustainability();
+            
+            if (window.innerWidth < 768) toggleSidebar();
+        }
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            sb.classList.toggle('-ml-64');
+        }
+
+        // Simulate a fluctuating base load for the UI
+        setInterval(async () => {
+            const w = 600 + Math.random() * 200 + (Math.random() > 0.7 ? 1500 : 0);
+            document.getElementById('live-wattage').innerText = Math.floor(w);
+        }, 3000);
+
+        window.onload = () => {
+            updateOverview();
+            if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-ml-64');
+        };
+    </script>
+</body>
+</html>

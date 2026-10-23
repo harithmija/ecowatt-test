@@ -314,12 +314,12 @@ def ask_gemini(question, context, api_key):
 
     client = genai.Client(
         api_key=api_key,
-        http_options=types.HttpOptions(timeout=120000),
+        http_options=types.HttpOptions(timeout=60000),
     )
     r = client.interactions.create(
-        model="gemini-3.8-flash",
+        model="gemini-3.5-flash-lite",
         input=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}",
-        generation_config={"thinking_level": "low"},
+        generation_config={"thinking_level": "minimal"},
     )
     if not r.output_text:
         raise RuntimeError("Gemini returned no text response.")

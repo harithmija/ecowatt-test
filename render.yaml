@@ -2,18 +2,10 @@ services:
   - type: web
     name: ecowatt-ai
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
-    disk:
-      name: ecowatt-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
-      - key: ECOWATT_DB_PATH
-        value: /var/data/ecowatt.db
       - key: COOKIE_SECURE
         value: "1"
-      - key: GEMINI_API_KEY
-        sync: false

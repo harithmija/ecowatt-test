@@ -8,16 +8,13 @@
 
 The Gemini API key is optional for local development; without it, the advisor uses built-in rules. To use Gemini locally, set `GEMINI_API_KEY` in the same terminal before starting Uvicorn. Never put the key in source code or browser JavaScript.
 
-## Publish for the hackathon (Render)
+## Publish a free demo on Render
 
 1. Push this repository to GitHub.
-2. In Render, choose **New → Blueprint**, connect the repository, and deploy the `render.yaml` blueprint.
-3. When prompted, enter your Gemini API key for the secret `GEMINI_API_KEY` environment variable in Render. Do not commit it or send it in chat.
-4. Wait for the deployment health check to pass, then open the Render URL. Create a resident account to explore the dashboard and AI advisor.
+2. Open [Render Blueprints](https://dashboard.render.com/blueprints), connect the repository, and deploy the `render.yaml` Blueprint.
+3. Wait for the health check to pass, then open the Render URL and create a resident account. The advisor uses built-in rule-based responses unless an optional Gemini API key is configured privately in Render.
 
-The blueprint runs the FastAPI app and dashboard together, enables secure cookies for HTTPS, and stores the SQLite database on a persistent disk so accounts and saved actions survive restarts. The persistent disk requires a paid Render web-service plan. Check Render's current pricing before deploying. The advisor has a rule-based fallback if no key is configured or Gemini is unavailable; its response will say when it is using fallback advice.
-
-The demo's energy readings are simulated and shared across accounts on the same deployment. Ask judges to create their own account; do not share a personal account or use real household data. A public URL with an AI key can incur API usage, so set a suitable quota/budget in Google AI Studio and monitor it during judging.
+The Blueprint runs the FastAPI app and dashboard together and enables secure cookies over HTTPS. Free Render services can spin down when idle and take about a minute to wake up. Their filesystem is temporary, so SQLite accounts, sessions, actions, and sensor readings can be lost on restart, spin-down, or redeploy; simulated readings are recreated when the service starts. This setup is for trying the demo, not persistent household data or production use. Do not commit API keys or ingestion tokens. The demo's simulated readings are shared across accounts on the same deployment; ask viewers to create their own accounts rather than sharing yours.
 
 The app provides resident sign-up and sign-in. Accounts and hashed passwords are stored in `ecowatt.db`; browser sessions use an HTTP-only cookie and expire after seven days. Passwords must be at least 12 characters.
 

@@ -13,6 +13,14 @@ APPLIANCES = {  # id: (name, rated watts, room)
     2: ("Refrigerator", 150, "Kitchen"),
     3: ("Water heater", 3000, "Bathroom"),
     4: ("Washing machine", 500, "Laundry"),
+    5: ("Bedroom lights", 40, "Bedroom"),
+    6: ("Bedroom fan", 60, "Bedroom"),
+    7: ("Kitchen lights", 40, "Kitchen"),
+    8: ("Living room lights", 60, "Living room"),
+    9: ("Living room fan", 75, "Living room"),
+    10: ("Television", 120, "Living room"),
+    11: ("Bathroom lights", 20, "Bathroom"),
+    12: ("Laundry lights", 20, "Laundry"),
 }
 
 DEFAULT_TARIFF = None  # tariff now lives in tariff.py
@@ -22,6 +30,36 @@ RECS = {
     "Refrigerator": "Check the door seal, avoid placing hot food inside, and leave space around the coils.",
     "Water heater": "Shorten heating periods, lower the thermostat and check for dripping hot taps.",
     "Washing machine": "Use full loads and cold-water cycles where possible.",
+    "Bedroom lights": "Switch off bedroom lights when the room is empty and use daylight where practical.",
+    "Bedroom fan": "Switch off the fan when the room is empty; use a comfortable speed.",
+    "Kitchen lights": "Switch off kitchen lights when they are not needed.",
+    "Living room lights": "Switch off lights when the living room is empty and use daylight where practical.",
+    "Living room fan": "Switch off the fan when the room is empty; use a comfortable speed.",
+    "Television": "Turn the television off when it is not being watched instead of leaving it on standby.",
+    "Bathroom lights": "Switch off bathroom lights when they are not needed.",
+    "Laundry lights": "Switch off laundry lights when the room is empty.",
+}
+
+ACTION_RECOMMENDATIONS = {
+    "Air conditioner": [
+        {"id": "reduce_runtime", "label": "Reduce AC runtime by 1 hour per day", "reduction": 0.08},
+        {"id": "clean_filters", "label": "Clean the AC filters", "reduction": 0.03},
+        {"id": "raise_setpoint", "label": "Raise the thermostat setpoint by 1°C", "reduction": 0.05},
+    ],
+    "Refrigerator": [
+        {"id": "check_seal", "label": "Check and improve the refrigerator door seal", "reduction": 0.05},
+        {"id": "cool_food", "label": "Let hot food cool before refrigerating it", "reduction": 0.03},
+        {"id": "clear_coils", "label": "Leave space for airflow around the coils", "reduction": 0.03},
+    ],
+    "Water heater": [
+        {"id": "shorten_heating", "label": "Shorten water-heater use by 20%", "reduction": 0.20},
+        {"id": "lower_thermostat", "label": "Lower the water-heater thermostat setting", "reduction": 0.05},
+        {"id": "fix_drips", "label": "Fix dripping hot-water taps", "reduction": 0.05},
+    ],
+    "Washing machine": [
+        {"id": "full_loads", "label": "Run only full washing-machine loads", "reduction": 0.10},
+        {"id": "cold_cycles", "label": "Use cold-water washing cycles", "reduction": 0.15},
+    ],
 }
 
 
@@ -37,15 +75,22 @@ def init_db():
         CREATE INDEX IF NOT EXISTS ix_r ON readings(appliance_id, ts);
         CREATE TABLE IF NOT EXISTS actions(id INTEGER PRIMARY KEY AUTOINCREMENT, appliance TEXT, ts TEXT, note TEXT);
         """)
+        action_columns = {row[1] for row in c.execute("PRAGMA table_info(actions)")}
+        for column, sql_type in (
+            ("action_id", "TEXT"),
+            ("estimated_kwh", "REAL"),
+            ("estimated_rm", "REAL"),
+        ):
+            if column not in action_columns:
+                c.execute(f"ALTER TABLE actions ADD COLUMN {column} {sql_type}")
         for i, (n, w, r) in APPLIANCES.items():
             c.execute("INSERT OR IGNORE INTO appliances VALUES(?,?,?,?)", (i, n, w, r))
-        if c.execute("SELECT COUNT(*) FROM readings").fetchone()[0] == 0:
-            simulate(c)
+        c.execute("DELETE FROM readings WHERE source = 'simulated'")
+        simulate(c)
 
 
-def simulate(c, days=75, seed=7):
-    """Hourly simulated readings. The AC drifts upward in the last 7 days so the demo has an anomaly.
-    To use real sensors later, insert rows into `readings` with source='sensor'."""
+def simulate(c, days=75, seed=None):
+    """Generate fresh hourly demo readings while preserving rows from real sensors."""
     rng = np.random.default_rng(seed)
     end = datetime.now().replace(minute=0, second=0, microsecond=0)
     drift = end - timedelta(days=7)
@@ -58,7 +103,19 @@ def simulate(c, days=75, seed=7):
         fr = max(0, rng.normal(0.055, 0.006))
         wh = rng.uniform(0.5, 1.1) if h in (6, 7, 19, 20) else 0
         wm = rng.uniform(0.35, 0.7) if (wd in (1, 3, 5) and h in (19, 20)) else 0
-        for i, v in zip((1, 2, 3, 4), (ac, fr, wh, wm)):
+        bedroom_lights = rng.uniform(0.025, 0.04) if h in (6, 7) or 18 <= h < 23 else 0
+        bedroom_fan = rng.uniform(0.035, 0.06) if h >= 21 or h < 7 or (wd >= 5 and 12 <= h < 16) else 0
+        kitchen_lights = rng.uniform(0.025, 0.04) if h in (6, 7, 18, 19, 20) else 0
+        living_lights = rng.uniform(0.04, 0.06) if h in (6, 7) or 17 <= h < 23 else 0
+        living_fan = rng.uniform(0.045, 0.075) if 12 <= h < 17 or 19 <= h < 23 else 0
+        tv = rng.uniform(0.07, 0.12) if 19 <= h < 23 or (wd >= 5 and 13 <= h < 17) else 0
+        bathroom_lights = rng.uniform(0.012, 0.02) if h in (6, 7, 20, 21) else 0
+        laundry_lights = rng.uniform(0.012, 0.02) if h in (18, 19, 20) else 0
+        usage = (
+            ac, fr, wh, wm, bedroom_lights, bedroom_fan, kitchen_lights,
+            living_lights, living_fan, tv, bathroom_lights, laundry_lights,
+        )
+        for i, v in zip(APPLIANCES, usage):
             rows.append((i, ts.isoformat(), round(v, 4), round(v * 1000, 1), "simulated"))
     c.executemany("INSERT INTO readings VALUES(?,?,?,?,?)", rows)
 
@@ -67,6 +124,33 @@ def load_readings():
     with conn() as c:
         df = pd.read_sql("SELECT r.ts, r.kwh, r.power_w, r.source, a.name appliance FROM readings r "
                          "JOIN appliances a ON a.id=r.appliance_id", c, parse_dates=["ts"])
+        actions = c.execute(
+            "SELECT appliance, ts, action_id FROM actions WHERE action_id IS NOT NULL ORDER BY ts"
+        ).fetchall()
+    effects = {}
+    for appliance, ts, action_id in actions:
+        reduction = next(
+            (
+                action["reduction"]
+                for action in ACTION_RECOMMENDATIONS.get(appliance, [])
+                if action["id"] == action_id
+            ),
+            None,
+        )
+        if reduction is not None:
+            effects.setdefault((appliance, action_id), (pd.Timestamp(ts).floor("h"), reduction))
+
+    if effects:
+        simulated = df.source == "simulated"
+        for (appliance, _), (effective_at, reduction) in sorted(
+            effects.items(), key=lambda item: item[1][0]
+        ):
+            affected = (
+                simulated
+                & (df.appliance == appliance)
+                & (df.ts >= effective_at)
+            )
+            df.loc[affected, ["kwh", "power_w"]] *= 1 - reduction
     df["date"] = df.ts.dt.normalize()
     df["hour"] = df.ts.dt.hour
     return df
@@ -100,6 +184,22 @@ def saving_rm(month_kwh, saved_kwh, tariff=DEFAULT_TARIFF):
     return bill(month_kwh, tariff) - bill(max(0, month_kwh - saved_kwh), tariff)
 
 
+def action_estimates(appliance, appliance_month_kwh, household_month_kwh):
+    appliance_month_kwh = max(float(appliance_month_kwh), 0.0)
+    household_month_kwh = max(float(household_month_kwh), 0.0)
+    estimates = []
+    for action in ACTION_RECOMMENDATIONS.get(appliance, []):
+        saved_kwh = appliance_month_kwh * action["reduction"]
+        estimates.append({
+            "id": action["id"],
+            "label": action["label"],
+            "assumed_reduction_pct": action["reduction"] * 100,
+            "estimated_kwh": round(saved_kwh, 2),
+            "estimated_rm": round(saving_rm(household_month_kwh, saved_kwh), 2),
+        })
+    return estimates
+
+
 def appliance_stats(df, tariff=DEFAULT_TARIFF):
     """Compare the last 7 full days with the earlier baseline.
     high = recent average >15% above baseline; abnormal = >25% above AND at least 3 days beyond baseline+2sd."""
@@ -131,9 +231,20 @@ def appliance_stats(df, tariff=DEFAULT_TARIFF):
     return pd.DataFrame(out)
 
 
-def add_action(appliance, note):
+def add_action(appliance, note, action_id=None, estimated_kwh=None, estimated_rm=None):
     with conn() as c:
-        c.execute("INSERT INTO actions(appliance, ts, note) VALUES(?,?,?)", (appliance, datetime.now().isoformat(timespec="minutes"), note))
+        c.execute(
+            """INSERT INTO actions(appliance, ts, note, action_id, estimated_kwh, estimated_rm)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                appliance,
+                datetime.now().isoformat(timespec="minutes"),
+                note,
+                action_id,
+                estimated_kwh,
+                estimated_rm,
+            ),
+        )
 
 
 def load_actions():

@@ -52,6 +52,40 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        main, .view-section, .view-section > *, .view-section [class*="grid"] > * { min-width: 0; }
+        .view-section [id^="chart-"] { max-width: 100%; min-width: 0; }
+        @media (max-width: 1023px) {
+            body { height: 100dvh; min-height: 100dvh; }
+            #sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                z-index: 40;
+                width: min(18rem, 85vw);
+                height: 100dvh;
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+            }
+            body.sidebar-open #sidebar { transform: translateX(0); }
+            #sidebar-backdrop { display: none; }
+            body.sidebar-open #sidebar-backdrop { display: block; }
+            main { width: 100%; height: 100dvh; }
+            header { flex-wrap: wrap; gap: 0.5rem; }
+            #eco-home-card > div {
+                display: grid;
+                grid-template-columns: 5rem minmax(0, 1fr);
+                align-items: start;
+                gap: 1rem;
+            }
+            #eco-home-card > div > div:nth-child(2), #overview-detail-toggle { grid-column: 2; }
+            #overview-detail-toggle { justify-self: start; }
+            #view-advisor { height: calc(100dvh - 150px) !important; min-height: 320px; }
+            #view-advisor > div { min-height: 0; }
+            #chat-box { padding: 1rem; }
+        }
+        @media (max-width: 420px) {
+            #page-title { font-size: 1.125rem; line-height: 1.5rem; }
+            #user-controls button { padding: 0.25rem; }
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-slate-800">
@@ -66,7 +100,7 @@
     </div>
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-brand-900 text-white flex flex-col h-full z-20 flex-shrink-0 transition-all duration-300 shadow-xl relative" id="sidebar">
+    <aside class="w-64 bg-brand-900 text-white flex flex-col h-full z-20 flex-shrink-0 transition-all duration-300 shadow-xl relative" id="sidebar" aria-label="Main navigation">
         <div class="p-6 pb-2 flex items-center gap-3">
             <div class="bg-brand-500 text-white p-2 rounded-lg"><i class="ph-fill ph-leaf text-2xl"></i></div>
             <div>
@@ -108,9 +142,6 @@
             <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('recap', this)">
                 <i class="ph ph-gift text-lg"></i> <span class="font-medium">Weekly Recap</span>
             </div>
-            <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('bill', this)">
-                <i class="ph ph-receipt text-lg"></i> <span class="font-medium">Bill Explainer</span>
-            </div>
             <div class="nav-item flex items-center gap-3 px-4 py-3" onclick="switchTab('scheduler', this)">
                 <i class="ph ph-clock text-lg"></i> <span class="font-medium">Smart Scheduler</span>
             </div>
@@ -135,13 +166,14 @@
             </div>
         </div>
     </aside>
+    <button id="sidebar-backdrop" type="button" class="fixed inset-0 z-30 hidden bg-slate-950/50 md:hidden" onclick="toggleSidebar()" aria-label="Close navigation menu"></button>
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
         <!-- Header -->
         <header class="glass-panel px-8 py-4 flex items-center justify-between sticky top-0 z-10">
             <div class="flex items-center gap-4">
-                <button class="md:hidden text-slate-500 hover:text-slate-800" onclick="toggleSidebar()">
+                <button id="mobile-menu-toggle" type="button" class="lg:hidden text-slate-500 hover:text-slate-800" onclick="toggleSidebar()" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
                     <i class="ph ph-list text-2xl"></i>
                 </button>
                 <h2 class="text-2xl font-bold text-slate-800 tracking-tight" id="page-title">Dashboard Overview</h2>
@@ -233,12 +265,37 @@
 
             <!-- MONTHLY REPORT VIEW -->
             <div id="view-monthly" class="view-section space-y-6">
-                <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">Daily Consumption</h3>
-                        <select id="month-selector" onchange="loadMonthlyData()" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-500 outline-none font-medium p-2.5"></select>
+                <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-soft" aria-labelledby="monthly-usage-heading">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <h3 id="monthly-usage-heading" class="text-lg font-bold text-slate-800">Monthly usage details</h3>
+                        <select id="month-selector" onchange="loadMonthlyData()" aria-label="Select report month" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-500 outline-none font-medium p-2.5"></select>
                     </div>
+                    <div id="monthly-usage-details" class="text-sm text-slate-500">Loading monthly usage...</div>
+                </section>
+
+                <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+                    <h3 class="mb-6 text-lg font-bold text-slate-800">Daily Consumption</h3>
                     <div id="chart-bar-stacked" class="w-full h-[350px]"></div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+                    <section class="rounded-2xl border border-slate-100 bg-white p-5 shadow-soft lg:col-span-3" aria-labelledby="usage-calendar-heading">
+                        <div class="mb-4 flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <h3 id="usage-calendar-heading" class="text-lg font-bold text-slate-800">Usage calendar</h3>
+                                <p class="mt-1 text-sm text-slate-500">Select a day to view its usage. Shaded dates have readings.</p>
+                            </div>
+                            <span id="calendar-source" class="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800"></span>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500" aria-hidden="true">
+                            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                        </div>
+                        <div id="usage-calendar" class="mt-2 grid grid-cols-7 gap-1" role="group" aria-label="Days in selected month"></div>
+                    </section>
+                    <section id="selected-day-usage" class="rounded-2xl border border-slate-100 bg-white p-5 shadow-soft lg:col-span-2" aria-live="polite">
+                        <h3 class="text-lg font-bold text-slate-800">Daily usage details</h3>
+                        <p class="mt-2 text-sm text-slate-500">Choose a date with readings to see the daily breakdown.</p>
+                    </section>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -255,12 +312,12 @@
 
             <div id="view-map" class="view-section space-y-6">
                 <p class="text-slate-500">Explore appliance status and recent power use by room.</p>
-                <div id="map-content" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
+                <div id="map-content" class="grid grid-cols-1 gap-4 lg:grid-cols-3"></div>
             </div>
 
             <!-- APPLIANCES VIEW -->
             <div id="view-appliances" class="view-section space-y-6">
-                <p class="text-slate-500 mb-4">Detailed monitoring and anomaly detection for registered appliances.</p>
+                <p class="text-slate-500 mb-4">Detailed monitoring and anomaly detection for registered appliances. Recommended actions adjust later simulated readings using the estimated reduction shown; real sensor readings are never changed.</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="appliances-grid">
                     <p class="text-slate-500 text-sm">Loading appliances...</p>
                 </div>
@@ -370,7 +427,7 @@
             </div>
 
             <div id="view-budget" class="view-section space-y-6">
-                <p class="text-slate-500">Set a monthly spending goal and track whether your household is on pace.</p>
+                <p class="text-slate-500">Track your monthly spending goal, projected bill, and daily energy allowance.</p>
                 <div id="budget-content" class="space-y-4"></div>
             </div>
             <div id="view-challenges" class="view-section space-y-6">
@@ -380,12 +437,8 @@
             <div id="view-recap" class="view-section space-y-6">
                 <div id="recap-content"></div>
             </div>
-            <div id="view-bill" class="view-section space-y-6">
-                <p class="text-slate-500">Compare your bill with the app's estimate and review what each line item represents.</p>
-                <div id="bill-content"></div>
-            </div>
             <div id="view-scheduler" class="view-section space-y-6">
-                <p class="text-slate-500">Find quieter two-hour windows based on recent household usage.</p>
+                <p class="text-slate-500">See learned routines for every appliance, with lights and fans combined across rooms, and get a practical weekly guide to avoid unnecessary use.</p>
                 <div id="scheduler-content" class="space-y-4"></div>
             </div>
             <div id="view-compare" class="view-section space-y-6">
@@ -503,9 +556,17 @@
             });
         });
         const PALETTE = ["#16a34a", "#0B4F3C", "#f59e0b", "#38bdf8"];
-        const APP_COLORS = { "Air conditioner": "#16a34a", "Refrigerator": "#0B4F3C", "Water heater": "#f59e0b", "Washing machine": "#38bdf8" };
+        const APP_COLORS = {
+            "Air conditioner": "#16a34a", "Refrigerator": "#0B4F3C", "Water heater": "#f59e0b", "Washing machine": "#38bdf8",
+            "Bedroom lights": "#fbbf24", "Bedroom fan": "#8b5cf6", "Kitchen lights": "#f97316",
+            "Living room lights": "#eab308", "Living room fan": "#06b6d4", "Television": "#ec4899",
+            "Bathroom lights": "#a3e635", "Laundry lights": "#14b8a6"
+        };
+        const REPORT_COLORS = { Lights: "#eab308", Fans: "#06b6d4" };
         let charts = {};
         let simTimer;
+        let monthlyReportData = null;
+        let selectedMonthlyDate = null;
 
         function showAuth(message = '') {
             document.getElementById('auth-overlay').hidden = false;
@@ -593,7 +654,6 @@
         }
 
         async function initializeApp() {
-            if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('-ml-64');
             try {
                 const result = await api('/api/auth/me');
                 if (result.user) setCurrentUser(result.user);
@@ -683,7 +743,29 @@
                 charts.area.render();
 
                 // Alerts
-                const alertHtml = data.alerts.length ? data.alerts.map(a => {
+                const actionAlerts = data.action_impacts.map(action => {
+                    const ready = action.days_after > 0 && action.before_kwh != null && action.after_kwh != null;
+                    const reduced = ready && action.reduction_kwh >= 0;
+                    const detail = ready
+                        ? `${reduced ? 'Usage is down' : 'Usage is up'} ${Math.abs(Number(action.reduction_kwh)).toFixed(2)} kWh/day (${Math.abs(Number(action.reduction_pct)).toFixed(1)}%), from ${Number(action.before_kwh).toFixed(2)} to ${Number(action.after_kwh).toFixed(2)} kWh/day over ${action.days_after} day(s).`
+                        : 'Waiting for a full day of readings after this action to compare usage.';
+                    const source = ready
+                        ? action.simulated
+                            ? 'This comparison uses simulated readings and is illustrative, not proof that the action caused the change.'
+                            : 'This is a comparison of recorded readings, not proof that the action caused the change.'
+                        : '';
+                    return `
+                        <div class="p-4 rounded-xl border ${ready && reduced ? 'border-emerald-200 bg-emerald-50' : ready ? 'border-amber-200 bg-amber-50' : 'border-brand-100 bg-brand-50'} flex items-start gap-3">
+                            <i class="ph-fill ${ready && reduced ? 'ph-trend-down text-emerald-600' : 'ph-info text-brand-600'} text-xl mt-0.5"></i>
+                            <div>
+                                <h4 class="font-bold text-slate-800">${escapeHtml(action.appliance)} action · ${escapeHtml(action.ts.replace('T', ' '))}</h4>
+                                <p class="text-xs text-slate-600 mt-1">${escapeHtml(action.note)}</p>
+                                <p class="text-sm text-slate-700 mt-1">${escapeHtml(detail)}</p>
+                                ${source ? `<p class="text-xs text-slate-500 mt-2">${escapeHtml(source)}</p>` : ''}
+                            </div>
+                        </div>`;
+                });
+                const usageAlerts = data.alerts.length ? data.alerts.map(a => {
                     const isAbnormal = a.status === 'abnormal';
                     return `
                         <div class="p-4 rounded-xl border ${isAbnormal ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'} flex items-start gap-3">
@@ -694,8 +776,11 @@
                                 <p class="text-xs font-semibold ${isAbnormal ? 'text-rose-700' : 'text-amber-700'} mt-2">Next steps: ${a.rec}</p>
                             </div>
                         </div>`;
-                }).join('') : `<div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3"><i class="ph-fill ph-check-circle text-emerald-500 text-xl mt-0.5"></i><div><h4 class="font-bold text-slate-800">All Normal</h4><p class="text-sm text-slate-500 mt-1">No unusual consumption detected.</p></div></div>`;
-                document.getElementById('alerts-container').innerHTML = alertHtml;
+                }) : [];
+                const alerts = [...actionAlerts, ...usageAlerts];
+                document.getElementById('alerts-container').innerHTML = alerts.length
+                    ? alerts.join('')
+                    : `<div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3"><i class="ph-fill ph-check-circle text-emerald-500 text-xl mt-0.5"></i><div><h4 class="font-bold text-slate-800">All Normal</h4><p class="text-sm text-slate-500 mt-1">No unusual consumption detected.</p></div></div>`;
             } catch(e) { showApiError(e.message); }
         }
 
@@ -704,7 +789,7 @@
                 const months = await api('/api/months');
                 const sel = document.getElementById('month-selector');
                 sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
-                if(months.length) loadMonthlyData();
+                if(months.length) await loadMonthlyData();
             } catch(e) { showApiError(e.message); }
         }
 
@@ -713,6 +798,14 @@
             if(!m) return;
             try {
                 const data = await api(`/api/monthly?month=${m}`);
+                monthlyReportData = data;
+                renderMonthlyUsageDetails(data);
+                const availableDates = new Set(data.table.map(row => row.date));
+                selectedMonthlyDate = availableDates.has(selectedMonthlyDate)
+                    ? selectedMonthlyDate
+                    : data.table[data.table.length - 1]?.date || null;
+                renderUsageCalendar(m, data);
+                renderSelectedDayUsage(selectedMonthlyDate);
                 
                 // Stacked Bar
                 const barSeries = Object.keys(data.series).map(app => ({
@@ -722,7 +815,7 @@
                 charts.bar = new ApexCharts(document.querySelector("#chart-bar-stacked"), {
                     series: barSeries,
                     chart: { type: 'bar', height: 350, stacked: true, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
-                    colors: Object.keys(data.series).map(n => APP_COLORS[n]),
+                    colors: Object.keys(data.series).map(n => REPORT_COLORS[n] || APP_COLORS[n] || '#94a3b8'),
                     plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
                     dataLabels: { enabled: false },
                     xaxis: { categories: data.dates, type: 'datetime', labels: { format: 'dd MMM' } },
@@ -758,25 +851,121 @@
             } catch(e) { showApiError(e.message); }
         }
 
+        function renderUsageCalendar(month, data) {
+            const [year, monthNumber] = month.split('-').map(Number);
+            const monthStart = new Date(year, monthNumber - 1, 1);
+            const daysInMonth = new Date(year, monthNumber, 0).getDate();
+            const firstWeekday = monthStart.getDay();
+            const readingsByDate = new Map(data.table.map(row => [row.date, row]));
+            const cells = Array.from({ length: firstWeekday }, () =>
+                '<span class="min-h-12 rounded-lg" aria-hidden="true"></span>');
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = `${month}-${String(day).padStart(2, '0')}`;
+                const row = readingsByDate.get(date);
+                if (!row) {
+                    cells.push(`<span class="flex min-h-12 items-center justify-center rounded-lg text-sm text-slate-300" aria-label="${day}, no readings">${day}</span>`);
+                    continue;
+                }
+                const selected = date === selectedMonthlyDate;
+                cells.push(`<button type="button" onclick="selectMonthlyDate('${date}')" aria-pressed="${selected}" aria-label="${date}: ${Number(row.total).toFixed(2)} kWh" title="${Number(row.total).toFixed(2)} kWh"
+                    class="flex min-h-12 flex-col items-center justify-center rounded-lg border ${selected ? 'border-brand-800 bg-brand-800 text-white' : 'border-brand-100 bg-brand-50 text-brand-900 hover:border-brand-500 hover:bg-brand-100'}">
+                    <span class="text-sm font-semibold">${day}</span><span class="text-[10px] ${selected ? 'text-brand-100' : 'text-brand-700'}">${Number(row.total).toFixed(1)}</span>
+                </button>`);
+            }
+            const monthLabel = monthStart.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+            document.getElementById('usage-calendar-heading').textContent = `${monthLabel} usage calendar`;
+            document.getElementById('usage-calendar').innerHTML = cells.join('');
+            document.getElementById('calendar-source').textContent = data.simulated ? 'Simulated readings' : 'Meter readings';
+        }
+
+        function selectMonthlyDate(date) {
+            selectedMonthlyDate = date;
+            const month = document.getElementById('month-selector').value;
+            renderUsageCalendar(month, monthlyReportData);
+            renderSelectedDayUsage(date);
+        }
+
+        function renderMonthlyUsageDetails(data) {
+            const categories = Object.entries(data.series).map(([name, values]) => ({
+                name,
+                kwh: values.reduce((total, value) => total + Number(value), 0)
+            }));
+            document.getElementById('monthly-usage-details').innerHTML = `
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_2fr]">
+                    <div class="rounded-xl bg-brand-50 p-4">
+                        <p class="text-sm font-medium text-brand-800">${data.partial ? 'Month to date' : 'Full month'}</p>
+                        <p class="mt-1 text-3xl font-bold text-brand-900">${Number(data.total).toFixed(2)} <span class="text-base font-medium">kWh</span></p>
+                    </div>
+                    <div>
+                        <p class="mb-2 text-sm font-semibold text-slate-700">Usage by category</p>
+                        <ul class="grid grid-cols-1 gap-x-6 sm:grid-cols-2">${categories.map(category => `
+                            <li class="flex items-center justify-between gap-3 border-t border-slate-100 py-2">
+                                <span class="flex items-center gap-2 text-sm text-slate-600"><span class="h-2.5 w-2.5 rounded-full" style="background:${REPORT_COLORS[category.name] || APP_COLORS[category.name] || '#94a3b8'}"></span>${escapeHtml(category.name)}</span>
+                                <span class="text-sm font-semibold text-slate-800">${category.kwh.toFixed(2)} kWh</span>
+                            </li>`).join('')}</ul>
+                    </div>
+                </div>`;
+        }
+
+        function renderSelectedDayUsage(date) {
+            const panel = document.getElementById('selected-day-usage');
+            const row = monthlyReportData?.table.find(item => item.date === date);
+            if (!row) {
+                panel.innerHTML = '<h3 class="text-lg font-bold text-slate-800">Daily usage details</h3><p class="mt-2 text-sm text-slate-500">Choose a date with readings to see the daily breakdown.</p>';
+                return;
+            }
+            const [year, month, day] = date.split('-').map(Number);
+            const label = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+            });
+            const appliances = Object.keys(row).filter(name => name !== 'date' && name !== 'total');
+            panel.innerHTML = `
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Daily usage details</p>
+                <h3 class="mt-1 text-lg font-bold text-slate-800">${escapeHtml(label)}</h3>
+                <p class="mt-3 text-2xl font-bold text-slate-800">${Number(row.total).toFixed(2)} <span class="text-sm font-medium text-slate-500">kWh that day</span></p>
+                <ul class="mt-3 space-y-2">${appliances.map(name => `
+                    <li class="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <span class="flex items-center gap-2 text-sm text-slate-600"><span class="h-2.5 w-2.5 rounded-full" style="background:${REPORT_COLORS[name] || APP_COLORS[name] || '#94a3b8'}"></span>${escapeHtml(name)}</span>
+                        <span class="text-sm font-semibold text-slate-800">${Number(row[name]).toFixed(2)} kWh</span>
+                    </li>`).join('')}</ul>
+                <p class="mt-4 text-xs text-slate-500">${monthlyReportData.simulated ? 'Demo data: these appliance readings are simulated.' : 'Usage is shown from available meter readings.'}</p>`;
+        }
+
         async function loadHomeMap() {
             const appliances = await api('/api/appliances');
             let selected = Math.max(0, appliances.findIndex(app => app.status === 'abnormal'));
+            const rooms = Object.values(appliances.reduce((groups, item, index) => {
+                if (!groups[item.room]) groups[item.room] = { name: item.room, appliances: [], month_kwh: 0 };
+                groups[item.room].appliances.push({ ...item, index });
+                groups[item.room].month_kwh += Number(item.month_kwh);
+                return groups;
+            }, {})).sort((a, b) => b.month_kwh - a.month_kwh);
+            const topRoom = rooms[0];
             const render = () => {
                 const app = appliances[selected];
-                const cards = appliances.map((item, index) => {
-                    const color = item.status === 'abnormal' ? 'border-rose-400 bg-rose-50' : item.status === 'high' ? 'border-amber-400 bg-amber-50' : 'border-emerald-300 bg-white';
-                    return `<button type="button" data-map-index="${index}" aria-pressed="${index === selected}" class="min-h-32 rounded-xl border-2 ${color} p-4 text-left shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500 ${index === selected ? 'ring-2 ring-brand-800' : ''}">
-                        <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500">${escapeHtml(item.room)}</span>
-                        <span class="mt-2 block font-bold text-slate-800">${escapeHtml(item.name)}</span>
-                        <span class="mt-1 block text-sm text-slate-600">${Number(item.power_w).toFixed(0)} W</span>
-                        <span class="mt-2 block text-xs font-semibold">${escapeHtml(item.status)}</span>
-                    </button>`;
+                const roomCards = rooms.map((room, roomIndex) => {
+                    const share = topRoom.month_kwh ? room.month_kwh / topRoom.month_kwh * 100 : 0;
+                    const devices = room.appliances.map(item => {
+                        const color = item.status === 'abnormal' ? 'border-rose-300 bg-rose-50' : item.status === 'high' ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white';
+                        return `<button type="button" data-map-index="${item.index}" aria-pressed="${item.index === selected}" class="flex w-full items-center justify-between gap-3 rounded-lg border ${color} p-3 text-left transition hover:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 ${item.index === selected ? 'ring-2 ring-brand-800' : ''}">
+                            <span class="min-w-0"><span class="block truncate text-sm font-semibold text-slate-800">${escapeHtml(item.name)}</span><span class="mt-1 block text-xs text-slate-500">${Number(item.power_w).toFixed(0)} W now · ${Number(item.month_kwh).toFixed(1)} kWh this month</span></span>
+                            <span class="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">${escapeHtml(item.status)}</span>
+                        </button>`;
+                    }).join('');
+                    return `<section class="rounded-xl border ${roomIndex === 0 ? 'border-brand-300 bg-brand-50/50' : 'border-slate-200 bg-slate-50/50'} p-4">
+                        <div class="flex items-start justify-between gap-2"><h4 class="font-bold text-slate-800">${escapeHtml(room.name)}${roomIndex === 0 ? ' · Most used' : ''}</h4><span class="shrink-0 text-sm font-semibold text-slate-700">${room.month_kwh.toFixed(1)} kWh</span></div>
+                        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-brand-600" style="width:${share}%"></div></div>
+                        <div class="mt-3 space-y-2">${devices}</div>
+                    </section>`;
                 }).join('');
                 document.getElementById('map-content').innerHTML = `
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-                        <div class="mb-4 flex items-center justify-between"><h3 class="font-bold">Home layout</h3><span class="text-xs text-slate-500">Select an appliance</span></div>
-                        <div class="grid grid-cols-2 gap-3">${cards}</div>
-                        <p class="mt-4 text-xs text-slate-500">Status colors reflect usage compared with each appliance's baseline; they do not diagnose a hardware fault.</p>
+                    <div class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft lg:col-span-2">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div><p class="text-xs font-semibold uppercase tracking-wider text-brand-800">Room energy this month</p><h3 class="mt-1 text-xl font-bold text-slate-800">${escapeHtml(topRoom.name)} uses the most</h3><p class="mt-1 text-sm text-slate-500">${topRoom.month_kwh.toFixed(1)} kWh · ${topRoom.appliances.length} appliances</p></div>
+                            <span class="rounded-full bg-brand-100 px-3 py-1 text-sm font-semibold text-brand-900">${rooms.length} rooms · ${appliances.length} appliances</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">${roomCards}</div>
+                        <p class="text-xs text-slate-500">Select an appliance for its usage details. Status colors compare use with that appliance's baseline and do not diagnose a fault.</p>
                     </div>
                     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
                         <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">${escapeHtml(app.room)}</p>
@@ -837,21 +1026,78 @@
                                 </div>
                             </div>
                             <p class="text-xs text-slate-500 mb-2">${escapeHtml(app.why)}</p>
-                            <form id="action-form-${index}" class="mt-4 flex flex-wrap gap-2">
-                                <label class="sr-only" for="action-note-${index}">Action taken for ${escapeHtml(app.name)}</label>
-                                <input id="action-note-${index}" type="text" maxlength="200" required placeholder="Record an action taken" class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                                <button class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white">Save</button>
+                            <form id="action-form-${index}" class="mt-4 space-y-3">
+                                <label class="block text-sm font-semibold text-slate-700" for="action-select-${index}">Choose a recommended action</label>
+                                <select id="action-select-${index}" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                                    <option value="">Select an action to see its estimated impact</option>
+                                    ${app.actions.map(action => `<option value="${escapeHtml(action.id)}">${escapeHtml(action.label)}</option>`).join('')}
+                                </select>
+                                <div id="action-estimate-${index}" class="min-h-12 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900" aria-live="polite">
+                                    Select an action to preview its estimated monthly savings.
+                                </div>
+                                <button disabled class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Save selected action</button>
+                            </form>
+                            <form id="custom-action-form-${index}" class="mt-5 space-y-3 border-t border-slate-100 pt-4">
+                                <label class="block text-sm font-semibold text-slate-700" for="custom-action-${index}">Or record your own action</label>
+                                <textarea id="custom-action-${index}" maxlength="200" required rows="2" placeholder="E.g., Turned off the AC when leaving the room" class="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
+                                <p class="text-xs text-slate-500">Your note will be added to the action log. Savings are not estimated for custom actions.</p>
+                                <button type="submit" class="rounded-lg border border-brand-800 px-4 py-2 text-sm font-semibold text-brand-900 hover:bg-brand-50 disabled:cursor-wait disabled:opacity-60">Save my action</button>
                             </form>
                         </div>
                     </div>`;
                 }).join('');
-                const history = actions.length ? actions.map(action => `<div class="border-t border-slate-100 py-3"><p class="font-semibold">${escapeHtml(action.appliance)} · ${escapeHtml(action.ts.replace('T', ' '))}</p><p class="text-sm text-slate-600">${escapeHtml(action.note)}</p><p class="text-xs text-slate-500">${action.days_after ? `${Number(action.before).toFixed(2)} to ${Number(action.after).toFixed(2)} kWh/day over ${action.days_after} day(s)` : 'Waiting for readings after this action to compare.'}</p></div>`).join('') : '<p class="text-sm text-slate-500">Actions you record will appear here with a before/after usage comparison.</p>';
+                const history = actions.length ? actions.map(action => {
+                    const estimated = action.estimated_kwh != null && action.estimated_rm != null
+                        ? `Estimated impact: ~${Number(action.estimated_kwh).toFixed(1)} kWh and RM ${Number(action.estimated_rm).toFixed(2)} saved per month if sustained.`
+                        : action.days_after && action.before != null && action.after != null
+                            ? `Measured usage: ${Number(action.before).toFixed(2)} to ${Number(action.after).toFixed(2)} kWh/day over ${action.days_after} day(s).`
+                            : 'No estimate was recorded for this action.';
+                    return `<div class="border-t border-slate-100 py-3"><p class="font-semibold">${escapeHtml(action.appliance)} · ${escapeHtml(action.ts.replace('T', ' '))}</p><p class="text-sm text-slate-600">${escapeHtml(action.note)}</p><p class="text-xs text-brand-800">${estimated}</p></div>`;
+                }).join('') : '<p class="text-sm text-slate-500">Actions you record will appear here with their estimated impact.</p>';
                 document.getElementById('appliances-grid').innerHTML = `${html}<div class="rounded-2xl bg-white p-6 shadow-soft md:col-span-2"><h3 class="mb-2 text-lg font-bold">Action log</h3>${history}</div>`;
                 data.forEach((app, index) => {
-                    document.getElementById(`action-form-${index}`).addEventListener('submit', async event => {
+                    const form = document.getElementById(`action-form-${index}`);
+                    const select = document.getElementById(`action-select-${index}`);
+                    const estimate = document.getElementById(`action-estimate-${index}`);
+                    const saveButton = form.querySelector('button[type="submit"], button:not([type])');
+                    select.addEventListener('change', () => {
+                        const selected = app.actions.find(action => action.id === select.value);
+                        saveButton.disabled = !selected;
+                        estimate.textContent = selected
+                            ? `Estimated impact if sustained: about ${Number(selected.estimated_kwh).toFixed(1)} kWh and RM ${Number(selected.estimated_rm).toFixed(2)} saved per month. This assumes an approximately ${Number(selected.assumed_reduction_pct).toFixed(0)}% reduction in projected appliance use; actual savings will vary.`
+                            : 'Select an action to preview its estimated monthly savings.';
+                    });
+                    form.addEventListener('submit', async event => {
                         event.preventDefault();
-                        const note = document.getElementById(`action-note-${index}`).value.trim();
-                        if (!note) return;
+                        if (!select.value) return;
+                        saveButton.disabled = true;
+                        saveButton.textContent = 'Saving...';
+                        try {
+                            await api('/api/actions', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ appliance: app.name, action_id: select.value })
+                            });
+                            await updateAppliances();
+                        } catch (error) {
+                            showFeatureError('appliances-grid', error);
+                            saveButton.disabled = false;
+                            saveButton.textContent = 'Save selected action';
+                        }
+                    });
+                    const customForm = document.getElementById(`custom-action-form-${index}`);
+                    const customInput = document.getElementById(`custom-action-${index}`);
+                    const customButton = customForm.querySelector('button[type="submit"]');
+                    customForm.addEventListener('submit', async event => {
+                        event.preventDefault();
+                        const note = customInput.value.trim();
+                        if (!note) {
+                            customInput.setCustomValidity('Enter an action to save.');
+                            customInput.reportValidity();
+                            return;
+                        }
+                        customInput.setCustomValidity('');
+                        customButton.disabled = true;
+                        customButton.textContent = 'Saving...';
                         try {
                             await api('/api/actions', {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -860,8 +1106,11 @@
                             await updateAppliances();
                         } catch (error) {
                             showFeatureError('appliances-grid', error);
+                            customButton.disabled = false;
+                            customButton.textContent = 'Save my action';
                         }
                     });
+                    customInput.addEventListener('input', () => customInput.setCustomValidity(''));
                 });
             } catch(e) { showApiError(e.message); }
         }
@@ -914,7 +1163,21 @@
         async function loadBudget() {
             const data = await api('/api/budget');
             const percent = Math.min(100, Math.round(data.spent / data.budget * 100));
+            const projectedOverBudget = Math.max(0, data.proj_bill - data.budget);
+            const remainingBudget = data.budget - data.spent;
+            const overBudget = projectedOverBudget > 0;
             document.getElementById('budget-content').innerHTML = `
+                <section class="rounded-2xl border ${overBudget ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'} p-5 shadow-soft sm:p-6">
+                    <p class="text-sm font-semibold ${overBudget ? 'text-amber-800' : 'text-emerald-800'}">Your monthly budget check</p>
+                    <h3 class="mt-1 text-xl font-bold text-slate-900">${overBudget ? `Current pace may exceed your budget by RM ${projectedOverBudget.toFixed(2)}` : 'Your projected bill is currently within budget'}</h3>
+                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="rounded-xl bg-white p-4"><p class="text-xs text-slate-500">Monthly budget</p><p class="mt-1 text-xl font-bold">RM ${data.budget.toFixed(2)}</p></div>
+                        <div class="rounded-xl bg-white p-4"><p class="text-xs text-slate-500">Projected month-end bill</p><p class="mt-1 text-xl font-bold">RM ${data.proj_bill.toFixed(2)}</p></div>
+                        <div class="rounded-xl bg-white p-4"><p class="text-xs text-slate-500">Average daily energy allowance*</p><p class="mt-1 text-xl font-bold">${data.daily_kwh.toFixed(1)} kWh/day</p></div>
+                    </div>
+                    <p class="mt-3 text-sm ${overBudget ? 'text-amber-900' : 'text-emerald-900'}">So far this month: RM ${data.spent.toFixed(2)} · Budget left: RM ${remainingBudget.toFixed(2)} · ${data.left} day(s) left.</p>
+                    <p class="mt-2 text-xs text-slate-600">*A guide based on your remaining budget and estimated bill. It is a household-wide target, not an appliance limit.</p>
+                </section>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="rounded-2xl bg-white p-6 shadow-soft">
                         <p class="text-sm text-slate-500">Spent so far</p>
@@ -1021,19 +1284,67 @@
 
         async function loadScheduler() {
             const data = await api('/api/scheduler');
+            const behavior = data.behavior.map(item => {
+                const flexible = item.routine_type === 'flexible';
+                const typicalDuration = flexible ? ` A typical run lasts ${Number(item.typical_duration_hours).toFixed(1)} hour(s).` : '';
+                const usualDays = item.preferred_days.length === 7
+                    ? 'every day'
+                    : item.preferred_days.map(escapeHtml).join(', ');
+                return `
+                <article class="rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div><h4 class="font-semibold text-slate-800">${escapeHtml(item.appliance)}</h4><p class="mt-0.5 text-xs text-slate-500">${escapeHtml(item.room || 'Home')}</p></div>
+                        <span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800">${flexible ? `${Number(item.weekly_runs)} usual run(s)/week` : (item.routine_type === 'continuous' ? 'Continuous use' : 'Usage pattern')}</span>
+                    </div>
+                    <p class="mt-2 text-sm text-slate-600">Your usual pattern: ${usualDays}${flexible ? ` around ${item.preferred_hours.map(hour => `${String(hour).padStart(2, '0')}:00`).join(' or ')}` : `, often ${item.preferred_windows.map(escapeHtml).join(' and ')}`}.${typicalDuration}</p>
+                    <p class="mt-1 text-sm text-slate-600">Typical use is about ${Number(item.typical_weekly_kwh).toFixed(1)} kWh per week.</p>
+                    <p class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">${escapeHtml(item.routine_tip)}</p>
+                    <p class="mt-2 text-xs text-slate-500">Pattern learned from ${Number(item.active_readings)} active hourly reading(s)</p>
+                </article>`;
+            }).join('');
+            const adviceList = items => items.length
+                ? `<ul class="space-y-2">${items.map(item => `<li class="rounded-lg bg-white/80 p-2.5">
+                    <p class="text-xs font-semibold text-slate-700">${escapeHtml(item.appliance)} · ${escapeHtml(item.time)}</p>
+                    <p class="mt-0.5 text-sm text-slate-600">${escapeHtml(item.advice)}</p>
+                </li>`).join('')}</ul>`
+                : '<p class="text-sm text-slate-500">No routine reminder for this day.</p>';
+            const weekRows = data.weekly_plan.map(day => `
+                <tr class="border-t border-slate-100 align-top">
+                    <th scope="row" class="whitespace-nowrap px-3 py-3 text-left text-sm font-semibold text-slate-800">${escapeHtml(day.weekday)}<span class="mt-1 block font-normal text-slate-500">${escapeHtml(day.date)}</span></th>
+                    <td class="min-w-[280px] px-3 py-3">${adviceList(day.use)}</td>
+                    <td class="min-w-[280px] px-3 py-3">${adviceList(day.save)}</td>
+                </tr>`).join('');
             document.getElementById('scheduler-content').innerHTML = `
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">${data.windows.map((window, index) => `<div class="rounded-2xl bg-white p-6 shadow-soft"><p class="text-sm text-slate-500">Recommended window ${index + 1}</p><p class="mt-1 text-2xl font-bold text-brand-900">${escapeHtml(window.start)}–${escapeHtml(window.end)}</p><p class="mt-2 text-sm text-slate-500">Average combined load: ${Number(window.load).toFixed(2)} kWh</p></div>`).join('')}</div>
-                <div class="rounded-2xl bg-white p-5 shadow-soft"><h3 class="mb-2 font-bold">Average household load by hour</h3><div id="chart-scheduler"></div></div>
-                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">These windows reflect recent usage, not electricity prices. Check your tariff before scheduling appliances to save money.</div>`;
-            if (charts.scheduler) charts.scheduler.destroy();
-            charts.scheduler = new ApexCharts(document.querySelector('#chart-scheduler'), {
-                series: [{ name: 'Average kWh', data: data.load.map(Number) }],
-                chart: { type: 'bar', height: 280, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
-                colors: ['#86efac'], plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
-                xaxis: { categories: data.hours.map(hour => `${String(hour).padStart(2, '0')}:00`) },
-                yaxis: { title: { text: 'Average kWh' } }, dataLabels: { enabled: false }
-            });
-            charts.scheduler.render();
+                <section class="rounded-2xl bg-white p-5 shadow-soft">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div><h3 class="font-bold">Appliances routine</h3><p class="mt-1 text-sm text-slate-500">Learned from when appliances were active in your historical readings.</p></div>
+                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">${escapeHtml(data.data_source)} data · ${Number(data.routine_history_days)} stable days</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">${behavior}</div>
+                </section>
+                <section class="rounded-2xl bg-white p-5 shadow-soft">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div><h3 class="font-bold">When to use and when to save</h3><p class="mt-1 text-sm text-slate-500">A seven-day guide based on your usual appliance activity, not automatic device control.</p></div>
+                        <span class="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800">Next 7 days</span>
+                    </div>
+                    <div class="mt-4 overflow-x-auto rounded-xl border border-slate-100">
+                        <table class="w-full min-w-[760px] text-left">
+                            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>
+                                <th scope="col" class="w-36 px-3 py-3">Day</th>
+                                <th scope="col" class="w-[42%] px-3 py-3"><span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>When to use</span></th>
+                                <th scope="col" class="w-[42%] px-3 py-3"><span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-amber-500"></span>When to save</span></th>
+                            </tr></thead>
+                            <tbody>${weekRows}</tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-500">On the current flat-rate tariff, shifting an appliance to another hour does not itself reduce the bill. Saving comes from using less energy. Follow appliance safety instructions and keep comfort and health needs first.</p>
+                </section>
+                ${data.alerts.map(alert => `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+                    <h3 class="font-bold">${escapeHtml(alert.appliance)} use is above its usual level</h3>
+                    <p class="mt-1 text-sm">Recent average: ${Number(alert.recent_daily_kwh).toFixed(1)} kWh/day · Usual stable-history average: ${Number(alert.usual_daily_kwh).toFixed(1)} kWh/day (${Number(alert.change_pct) > 0 ? '+' : ''}${Number(alert.change_pct).toFixed(0)}%). The routine above uses the stable history so this recent increase does not get mistaken for normal behavior.</p>
+                    <p class="mt-2 text-sm">Check whether the room was occupied, the thermostat setting, filters, and doors or windows. Keep comfort and health needs first; this usage pattern alone does not prove a fault.</p>
+                </section>`).join('')}
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">${data.data_source === 'simulated' ? 'Demo note: these routines come from simulated readings shared across accounts, so they are examples rather than personalized advice.' : 'Routine estimates come from your recorded readings. Adjust them to fit household needs and appliance instructions.'} Bill and energy figures are estimates; the scheduler does not control appliances or guarantee savings.</div>`;
         }
 
         async function loadComparison() {
@@ -1087,29 +1398,6 @@
                     await loadDevices();
                 } catch (error) {
                     status.textContent = error.message;
-                }
-            });
-        }
-
-        async function loadBillExplainer() {
-            document.getElementById('bill-content').innerHTML = `
-                <form id="bill-form" class="flex flex-wrap items-end gap-3 rounded-2xl bg-white p-6 shadow-soft">
-                    <label class="text-sm font-medium">Usage (kWh)<input id="bill-kwh" type="number" min="0" step="0.1" value="400" required class="mt-1 block w-36 rounded-lg border border-slate-300 px-3 py-2"></label>
-                    <label class="text-sm font-medium">Bill amount (RM)<input id="bill-amount" type="number" min="0" step="0.01" value="150" required class="mt-1 block w-36 rounded-lg border border-slate-300 px-3 py-2"></label>
-                    <button class="rounded-lg bg-brand-800 px-4 py-2 font-semibold text-white">Compare bill</button>
-                </form><div id="bill-result" class="mt-4"></div>`;
-            document.getElementById('bill-form').addEventListener('submit', async event => {
-                event.preventDefault();
-                const result = document.getElementById('bill-result');
-                try {
-                    const data = await api('/api/bill-check', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ kwh: Number(document.getElementById('bill-kwh').value), amount: Number(document.getElementById('bill-amount').value) })
-                    });
-                    result.innerHTML = `<div class="rounded-xl ${data.close ? 'bg-brand-50' : 'bg-amber-50'} p-4"><p class="font-semibold">${escapeHtml(data.verdict)}</p><p class="mt-1 text-sm">Our estimate: RM ${data.estimate.toFixed(2)}</p></div>
-                        <h3 class="my-4 font-bold">Estimated bill line items</h3><div class="space-y-2">${data.rows.map(row => `<div class="rounded-xl bg-white p-4 shadow-soft"><div class="flex justify-between gap-4"><b>${escapeHtml(row.name)}</b><b>RM ${Number(row.rm).toFixed(2)}</b></div><p class="mt-1 text-sm text-slate-500">${escapeHtml(row.why)}</p></div>`).join('')}</div>`;
-                } catch (error) {
-                    showFeatureError('bill-result', error);
                 }
             });
         }
@@ -1187,7 +1475,7 @@
                 overview: 'Dashboard Overview', monthly: 'Monthly Report', map: 'Home Map', appliances: 'Appliance Monitoring',
                 advisor: 'AI Energy Advisor', simulator: 'Savings Simulator', sustainability: 'Environmental Impact',
                 budget: 'Budget & Goals', challenges: 'Energy Challenges', recap: 'Weekly Recap',
-                bill: 'Bill Explainer', scheduler: 'Smart Scheduler', compare: 'Usage Comparison',
+                scheduler: 'Smart Scheduler', compare: 'Usage Comparison',
                 devices: 'Connected Devices', learn: 'Learn About Energy'
             };
             document.getElementById('page-title').innerText = titles[tabId];
@@ -1200,17 +1488,18 @@
             if (tabId === 'sustainability') updateSustainability();
             const loaders = {
                 budget: loadBudget, challenges: loadChallenges, recap: loadRecap,
-                bill: loadBillExplainer, scheduler: loadScheduler, compare: loadComparison,
+                scheduler: loadScheduler, compare: loadComparison,
                 devices: loadDevices, learn: loadLearning
             };
             if (loaders[tabId]) loaders[tabId]().catch(error => showFeatureError(`${tabId}-content`, error));
             
-            if (window.innerWidth < 768) toggleSidebar();
+            if (window.innerWidth < 1024 && document.body.classList.contains('sidebar-open')) toggleSidebar();
         }
 
         function toggleSidebar() {
-            const sb = document.getElementById('sidebar');
-            sb.classList.toggle('-ml-64');
+            const isOpen = !document.body.classList.contains('sidebar-open');
+            document.body.classList.toggle('sidebar-open', isOpen);
+            document.getElementById('mobile-menu-toggle').setAttribute('aria-expanded', String(isOpen));
         }
 
         // Simulate a fluctuating base load for the UI
@@ -1219,6 +1508,15 @@
             document.getElementById('live-wattage').innerText = Math.floor(w);
         }, 3000);
 
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024 && document.body.classList.contains('sidebar-open')) {
+                document.body.classList.remove('sidebar-open');
+                document.getElementById('mobile-menu-toggle').setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) toggleSidebar();
+        });
         window.onload = initializeApp;
     </script>
 </body>

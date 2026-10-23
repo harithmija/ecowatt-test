@@ -1,19 +1,10 @@
-"""Friendly-features API: eco score, budget, challenges, recap, bill explainer, scheduler, compare, devices."""
+"""Friendly-features API: eco score, budget, challenges, recap, scheduler, compare, devices."""
 from datetime import datetime
 import numpy as np
 import pandas as pd
 from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel
 import core, config
-
-EXPLAIN = {
-    "Electricity (generation, capacity, network)": "The cost of making the power and delivering it to your home.",
-    "Fuel adjustment (AFA)": "A monthly adjustment for fuel prices. It changes every month and is not charged at or below 600 kWh.",
-    "Retail charge": "A flat RM10 a month to cover billing and customer service. Waived at or below 600 kWh.",
-    "Renewable energy fund (1.6%)": "A small levy that funds renewable energy. Not charged at or below 300 kWh.",
-    "Service tax (8%)": "Tax on the part of your usage above 600 kWh only.",
-}
-
 
 def _budget():
     with core.conn() as c:
@@ -28,6 +19,14 @@ def _kwh_for(rm):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if core.bill(mid) < rm else (lo, mid)
     return lo
+
+
+def _scheduler_category(appliance):
+    if appliance.lower().endswith(" lights"):
+        return "Lights"
+    if appliance.lower().endswith(" fan"):
+        return "Fans"
+    return appliance
 
 
 def _score(df, last, proj, st, budget):
@@ -45,15 +44,285 @@ class Budget(BaseModel):
     budget: float
 
 
-class Bill(BaseModel):
-    kwh: float
-    amount: float
-
-
 class Reading(BaseModel):
     appliance: str
     kwh: float
     ts: str | None = None
+
+
+def _scheduler_plan(df):
+    flexible = ("Washing machine", "Water heater", "Television", "Lights", "Fans")
+    monitored = ("Air conditioner", "Refrigerator", *flexible)
+    last = pd.Timestamp(df.date.max()).normalize()
+    history_start = last - pd.Timedelta(days=55)
+    history = df[df.date >= history_start].copy()
+    history["appliance"] = history.appliance.map(_scheduler_category)
+    history = history.groupby(["date", "hour", "appliance"], as_index=False).agg(
+        kwh=("kwh", "sum"),
+        source=("source", lambda sources: "simulated" if (sources == "simulated").all() else "sensor"),
+    )
+    dates = pd.date_range(history.date.min(), last, freq="D")
+    if len(dates) < 28:
+        raise ValueError("At least 28 days of usage history are needed to learn scheduling behavior.")
+
+    recent_start = last - pd.Timedelta(days=6)
+    recent = history[history.date >= recent_start]
+    stable = history[history.date < recent_start]
+    stable_dates = pd.date_range(stable.date.min(), stable.date.max(), freq="D")
+    weeks = len(stable_dates) / 7
+    minimum_events = max(2, int(weeks * 0.25))
+    templates = []
+    behavior = []
+    for appliance in flexible:
+        readings = stable[stable.appliance == appliance]
+        events = {}
+        for date, day in readings.groupby("date"):
+            active = day[day.kwh >= 0.01].sort_values("hour")
+            if active.empty:
+                continue
+            hours = active.hour.astype(int).tolist()
+            groups = []
+            for hour in hours:
+                if not groups or hour != groups[-1][-1] + 1:
+                    groups.append([hour])
+                else:
+                    groups[-1].append(hour)
+            for group in groups:
+                start, duration = group[0], len(group)
+                profile = [float(active.loc[active.hour == hour, "kwh"].sum()) for hour in group]
+                key = (int(pd.Timestamp(date).dayofweek), start, duration)
+                events.setdefault(key, []).append(profile)
+
+        for (weekday, start, duration), profiles in events.items():
+            if len(profiles) < minimum_events:
+                continue
+            typical_profile = np.mean(np.asarray(profiles), axis=0).tolist()
+            templates.append({
+                "appliance": appliance,
+                "weekday": weekday,
+                "preferred_start": start,
+                "duration": duration,
+                "profile": typical_profile,
+                "event_count": len(profiles),
+            })
+
+    day_names = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    behavior = []
+    for appliance in monitored:
+        readings = stable[stable.appliance == appliance]
+        threshold = 0.01 if appliance in ("Refrigerator", "Lights", "Fans", "Television") else 0.1
+        active = readings[readings.kwh >= threshold]
+        learned = [item for item in templates if item["appliance"] == appliance]
+        if active.empty:
+            continue
+
+        daily_use = active.groupby("date").kwh.sum()
+        active_days = set(pd.to_datetime(daily_use.index).dayofweek)
+        hour_use_days = active.groupby("hour").date.nunique()
+        common_hours = sorted(
+            int(hour) for hour, count in hour_use_days.items()
+            if count / max(1, len(stable_dates)) >= (0.9 if appliance == "Refrigerator" else 0.25)
+        )
+        if len(common_hours) == 24:
+            time_windows = ["all day"]
+        else:
+            time_windows = []
+            windows = []
+            for hour in common_hours:
+                if not windows or hour != windows[-1][-1] + 1:
+                    windows.append([hour])
+                else:
+                    windows[-1].append(hour)
+            if appliance == "Air conditioner" and len(windows) > 1 and windows[0][0] == 0 and windows[-1][-1] == 23:
+                time_windows = [f"{windows[-1][0]:02d}:00–{(windows[0][-1] + 1) % 24:02d}:00"]
+                windows = windows[1:-1]
+            time_windows.extend(
+                f"{window[0]:02d}:00–{(window[-1] + 1) % 24:02d}:00"
+                for window in windows
+            )
+
+        routine = {
+            "appliance": appliance,
+            "room": {
+                "Air conditioner": "Bedroom",
+                "Refrigerator": "Kitchen",
+                "Water heater": "Bathroom",
+                "Washing machine": "Laundry",
+                "Television": "Living room",
+                "Lights": "All rooms",
+                "Fans": "All rooms",
+            }[appliance],
+            "preferred_days": [day_names[day] for day in sorted(active_days)],
+            "preferred_windows": time_windows or ["throughout the day"],
+            "active_readings": int(len(active)),
+            "typical_weekly_kwh": round(float(daily_use.mean() * 7), 2),
+        }
+        if appliance == "Refrigerator":
+            routine.update({
+                "routine_type": "continuous",
+                "routine_tip": "This appliance uses energy throughout the day. Keep the door closed, check the seal, and leave airflow around it; it is not a device to schedule off.",
+            })
+        elif appliance == "Air conditioner":
+            routine.update({
+                "routine_type": "comfort-guidance",
+                "routine_tip": "These are the usual cooling periods in the stable history. Keep comfort and health first; if a room is empty, consider a suitable timer or a modest setpoint adjustment.",
+            })
+        elif appliance in ("Lights", "Fans", "Television"):
+            preferred_hours = {}
+            for item in learned:
+                preferred_hours.setdefault(item["preferred_start"], 0)
+                preferred_hours[item["preferred_start"]] += item["event_count"]
+            routine.update({
+                "routine_type": "flexible",
+                "preferred_hours": sorted(preferred_hours) or common_hours,
+                "typical_duration_hours": round(
+                    float(np.median([item["duration"] for item in learned]))
+                    if learned else 1,
+                    1,
+                ),
+                "weekly_runs": len(learned),
+                "routine_tip": {
+                    "Lights": "Switch lights off when rooms are empty and use daylight when practical. Typical active hours are not a reason to keep lights on.",
+                    "Fans": "Switch fans off when rooms are empty and use a comfortable speed. Typical active hours are not a reason to run a fan unnecessarily.",
+                    "Television": "Turn the television off when nobody is watching instead of leaving it on standby.",
+                }[appliance],
+            })
+        else:
+            preferred_hours = {}
+            for item in learned:
+                preferred_hours.setdefault(item["preferred_start"], 0)
+                preferred_hours[item["preferred_start"]] += item["event_count"]
+            routine.update({
+                "routine_type": "flexible",
+                "preferred_hours": sorted(preferred_hours),
+                "typical_duration_hours": round(float(np.median([item["duration"] for item in learned])), 1),
+                "weekly_runs": len(learned),
+                "routine_tip": (
+                    "Keep laundry to these usual days and run a full load where practical, rather than adding small extra cycles."
+                    if appliance == "Washing machine"
+                    else "Heat water only when needed; switch it off after use or use a timer instead of leaving it on."
+                ),
+            })
+        behavior.append(routine)
+
+    future_dates = [last + pd.Timedelta(days=offset) for offset in range(1, 8)]
+    jobs = []
+    for date in future_dates:
+        for template in templates:
+            if date.dayofweek == template["weekday"]:
+                jobs.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "weekday": date.strftime("%A"),
+                    "appliance": template["appliance"],
+                    "start": f"{template['preferred_start']:02d}:00",
+                    "end": f"{(template['preferred_start'] + template['duration']) % 24:02d}:00",
+                    "duration_hours": template["duration"],
+                    "typical_kwh": round(sum(template["profile"]), 2),
+                })
+
+    if not any(item["routine_type"] == "flexible" for item in behavior):
+        raise ValueError("No repeatable routines were found in the available appliance history.")
+
+    routines = {item["appliance"]: item for item in behavior}
+    jobs_by_date = {}
+    for job in jobs:
+        jobs_by_date.setdefault(job["date"], []).append(job)
+    weekly_plan = []
+    for date in future_dates:
+        date_key = date.strftime("%Y-%m-%d")
+        day_jobs = jobs_by_date.get(date_key, [])
+        use = []
+        save = []
+        ac_routine = routines.get("Air conditioner")
+        if ac_routine:
+            windows = ", ".join(ac_routine["preferred_windows"])
+            use.append({
+                "appliance": "Air conditioner",
+                "time": windows,
+                "advice": f"When cooling is needed and the room is occupied, these are the usual periods: {windows}.",
+            })
+            save.append({
+                "appliance": "Air conditioner",
+                "time": "When the room is empty",
+                "advice": "Consider a suitable timer, close doors and windows, and clean filters. Keep comfort and health needs first.",
+            })
+        if "Refrigerator" in routines:
+            use.append({
+                "appliance": "Refrigerator",
+                "time": "All day",
+                "advice": "Keep it running; it is a continuous-use appliance, not one to switch off on a schedule.",
+            })
+            save.append({
+                "appliance": "Refrigerator",
+                "time": "Every day",
+                "advice": "Open the door only as needed, check the seal, and leave space around the appliance for airflow.",
+            })
+        for appliance in ("Lights", "Fans", "Television"):
+            routine = routines.get(appliance)
+            if not routine:
+                continue
+            if date.strftime("%A") in routine["preferred_days"]:
+                use.append({
+                    "appliance": appliance,
+                    "time": ", ".join(routine["preferred_windows"]),
+                    "advice": f"Your readings most often show use around {', '.join(routine['preferred_windows'])}. Use only when needed.",
+                })
+            save.append({
+                "appliance": appliance,
+                "time": "When not needed",
+                "advice": routine["routine_tip"],
+            })
+        for job in day_jobs:
+            if job["appliance"] in ("Lights", "Fans", "Television"):
+                continue
+            use.append({
+                "appliance": job["appliance"],
+                "time": f"{job['start']}–{job['end']}",
+                "advice": f"Usual run: about {job['typical_kwh']:.1f} kWh for {job['duration_hours']} hour(s).",
+            })
+        washing = routines.get("Washing machine")
+        if washing and not any(job["appliance"] == "Washing machine" for job in day_jobs):
+            days = ", ".join(washing["preferred_days"])
+            save.append({
+                "appliance": "Washing machine",
+                "time": "Wait for a usual laundry day",
+                "advice": f"Add to a full load on your usual {days} routine rather than running an extra small cycle.",
+            })
+        if "Water heater" in routines:
+            save.append({
+                "appliance": "Water heater",
+                "time": "After use",
+                "advice": "Switch it off when hot water is no longer needed; avoid heating water without a current need.",
+            })
+        weekly_plan.append({
+            "date": date_key,
+            "weekday": date.strftime("%A"),
+            "use": use,
+            "save": save,
+        })
+
+    ac_history = history[history.appliance == "Air conditioner"]
+    ac_stable = stable[stable.appliance == "Air conditioner"]
+    ac_recent_daily = ac_history[ac_history.date >= recent_start].groupby("date").kwh.sum()
+    ac_stable_daily = ac_stable.groupby("date").kwh.sum()
+    ac_recent_average = float(ac_recent_daily.mean()) if not ac_recent_daily.empty else 0
+    ac_usual_average = float(ac_stable_daily.mean()) if not ac_stable_daily.empty else 0
+    ac_change_pct = (ac_recent_average / ac_usual_average - 1) * 100 if ac_usual_average else 0
+    return {
+        "history_days": len(dates),
+        "routine_history_days": len(stable_dates),
+        "activity_readings": sum(item["active_readings"] for item in behavior),
+        "data_source": "simulated" if (history.source == "simulated").all() else "mixed/sensor",
+        "behavior": behavior,
+        "jobs": jobs,
+        "weekly_plan": weekly_plan,
+        "alerts": [{
+            "appliance": "Air conditioner",
+            "recent_daily_kwh": round(ac_recent_average, 2),
+            "usual_daily_kwh": round(ac_usual_average, 2),
+            "change_pct": round(ac_change_pct, 1),
+        }] if ac_change_pct >= 25 else [],
+    }
 
 
 def register(app, data, ctx, clean, invalidate, require_resident):
@@ -138,25 +407,12 @@ def register(app, data, ctx, clean, invalidate, require_resident):
                           worst=day.idxmax(), worst_kwh=day.max(), top=top, night=night, tip=core.RECS[top],
                           start=end - pd.Timedelta(days=6), end=end, dates=list(day.index), vals=list(day.values)))
 
-    @app.post("/api/bill-check", dependencies=[Depends(require_resident)])
-    def bill_check(b: Bill):
-        est = core.bill(b.kwh)
-        diff = b.amount - est
-        close = abs(diff) <= max(3, .05 * est)
-        verdict = ("Your bill is close to our estimate." if close else
-                   f"Your bill is RM {abs(diff):.2f} {'higher' if diff > 0 else 'lower'} than our estimate. Possible reasons: a different AFA rate, "
-                   "rebates or incentives, arrears or other charges, or meter-reading dates. Compare line by line with your TNB bill.")
-        rows = [dict(name=r["Charge"], rm=r["Amount (RM)"], why=EXPLAIN.get(r["Charge"], "")) for r in core.tier_rows(b.kwh).to_dict("records")]
-        return clean(dict(estimate=est, diff=diff, close=close, verdict=verdict, rows=rows))
-
     @app.get("/api/scheduler", dependencies=[Depends(require_resident)])
     def scheduler():
-        df, last, *_ = ctx()
-        d = df[df.date >= last - pd.Timedelta(days=14)]
-        hr = d.groupby(["date", "hour"]).kwh.sum().groupby("hour").mean()
-        win = sorted(((h, hr[h] + hr[(h + 1) % 24]) for h in range(8, 21)), key=lambda x: x[1])[:3]
-        return clean(dict(hours=[int(h) for h in hr.index], load=list(hr.values),
-                          windows=[dict(start=f"{h:02d}:00", end=f"{h + 2:02d}:00", load=v) for h, v in win]))
+        try:
+            return clean(_scheduler_plan(data()))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     @app.get("/api/compare", dependencies=[Depends(require_resident)])
     def compare():

@@ -202,12 +202,50 @@ def overview(user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     fl = st[st.status.isin(["abnormal", "high"])].sort_values("extra_month_rm", ascending=False)
     t30 = df[df.date > last - pd.Timedelta(days=30)].groupby(["date", "appliance"]).kwh.sum().unstack().fillna(0)
+    action_cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=7)
+    action_impacts = []
+    for action in core.load_actions().itertuples():
+        action_ts = pd.Timestamp(action.ts)
+        if action_ts < action_cutoff or not action.action_id:
+            continue
+        before, after, days_after = core.review_action(df, action.appliance, action.ts)
+        before_dates = df.loc[
+            (df.appliance == action.appliance)
+            & (df.date < action_ts.normalize()),
+            "date",
+        ].drop_duplicates().sort_values().tail(7)
+        before_readings = df[
+            (df.appliance == action.appliance)
+            & df.date.isin(before_dates)
+        ]
+        after_readings = df[
+            (df.appliance == action.appliance)
+            & (df.date > action_ts.normalize())
+        ]
+        action_impacts.append(dict(
+            ts=action.ts,
+            appliance=action.appliance,
+            note=action.note,
+            days_after=days_after,
+            before_kwh=before,
+            after_kwh=after,
+            reduction_kwh=before - after if days_after and pd.notna(before) and pd.notna(after) else None,
+            reduction_pct=(before - after) / before * 100
+            if days_after and pd.notna(before) and before > 0 and pd.notna(after) else None,
+            simulated=bool(
+                not before_readings.empty
+                and not after_readings.empty
+                and (before_readings.source == "simulated").all()
+                and (after_readings.source == "simulated").all()
+            ),
+        ))
     return clean(dict(
         month=last.strftime("%B %Y"), day=last.day, days=last.days_in_month,
         kwh=cur.kwh.sum(), bill=core.bill(cur.kwh.sum()), proj_kwh=proj, proj_bill=core.bill(proj),
         savings=fl.extra_month_rm.sum(), simulated=bool((df.source == "simulated").all()),
         by_appliance=cur.groupby("appliance").kwh.sum().to_dict(),
         trend=dict(dates=list(t30.index), series={c: list(t30[c]) for c in t30}),
+        action_impacts=action_impacts,
         alerts=[dict(appliance=r.appliance, status=r.status, why=r.why, rec=core.RECS[r.appliance], rm=r.extra_month_rm) for r in fl.itertuples()]))
 
 
@@ -222,13 +260,19 @@ def monthly(month: str, user=Depends(require_role("resident"))):
     d = df[df.date.dt.strftime("%Y-%m") == month]
     if d.empty:
         raise HTTPException(404, "No data for that month")
-    daily = d.groupby(["date", "appliance"]).kwh.sum().unstack().fillna(0)
+    report = d.assign(category=d.appliance.map(
+        lambda name: "Lights" if name.lower().endswith("lights")
+        else "Fans" if name.lower().endswith("fan")
+        else name
+    ))
+    daily = report.groupby(["date", "category"]).kwh.sum().unstack().fillna(0)
     dd = daily.sum(axis=1)
     hm = d.groupby(["hour", "date"]).kwh.sum().unstack().fillna(0)
     tot = d.kwh.sum()
     return clean(dict(
         total=tot, bill=core.bill(tot), avg=dd.mean(), peak_day=dd.idxmax(), peak_kwh=dd.max(),
-        top=d.groupby("appliance").kwh.sum().idxmax(), partial=month == last.strftime("%Y-%m"), days_recorded=len(dd),
+        top=report.groupby("category").kwh.sum().idxmax(), partial=month == last.strftime("%Y-%m"), days_recorded=len(dd),
+        simulated=bool((d.source == "simulated").all()),
         dates=list(daily.index), series={c: list(daily[c]) for c in daily}, cum_rm=[core.bill(k) for k in dd.cumsum()],
         heat=dict(x=list(hm.columns), y=list(hm.index), z=hm.values.tolist()),
         breakdown=core.tier_rows(tot).to_dict("records"),
@@ -242,22 +286,47 @@ def appliances(user=Depends(require_role("resident"))):
     for name, w, room in core.APPLIANCES.values():
         a, r = df[df.appliance == name], st[st.appliance == name].iloc[0]
         d = a.groupby("date").kwh.sum().tail(30)
+        projected_appliance_kwh = cur[cur.appliance == name].kwh.sum() / last.day * last.days_in_month
         out.append(dict(name=name, room=room, rated_w=w, power_w=a.sort_values("ts").power_w.iloc[-1],
                         month_kwh=cur[cur.appliance == name].kwh.sum(), status=r.status, baseline=r.baseline, recent=r.recent,
-                        pct=r.pct, why=r.why, rec=core.RECS[name], extra_rm=r.extra_month_rm, dates=list(d.index), kwh=list(d.values)))
+                        pct=r.pct, why=r.why, rec=core.RECS[name], extra_rm=r.extra_month_rm, dates=list(d.index), kwh=list(d.values),
+                        actions=core.action_estimates(name, projected_appliance_kwh, proj)))
     return clean(out)
 
 
 class Act(BaseModel):
-    appliance: str
-    note: str
+    appliance: str = Field(min_length=1, max_length=100)
+    action_id: str | None = None
+    note: str | None = Field(default=None, max_length=200)
 
 
 @app.post("/api/actions")
 def add_action(a: Act, user=Depends(require_role("resident"))):
-    if a.appliance not in [v[0] for v in core.APPLIANCES.values()] or not a.note.strip():
+    if a.appliance not in [v[0] for v in core.APPLIANCES.values()]:
         raise HTTPException(400, "Invalid action")
+    if a.action_id:
+        df, last, cur, proj, _ = ctx()
+        appliance_kwh = cur[cur.appliance == a.appliance].kwh.sum() / last.day * last.days_in_month
+        estimate = next(
+            (item for item in core.action_estimates(a.appliance, appliance_kwh, proj)
+             if item["id"] == a.action_id),
+            None,
+        )
+        if estimate is None:
+            raise HTTPException(400, "Choose a recommended action for this appliance")
+        core.add_action(
+            a.appliance,
+            estimate["label"],
+            action_id=estimate["id"],
+            estimated_kwh=estimate["estimated_kwh"],
+            estimated_rm=estimate["estimated_rm"],
+        )
+        invalidate_data()
+        return {"ok": True, "estimate": estimate}
+    if not a.note or not a.note.strip():
+        raise HTTPException(400, "Choose a recommended action or enter an action note")
     core.add_action(a.appliance, a.note.strip()[:200])
+    invalidate_data()
     return {"ok": True}
 
 
@@ -266,7 +335,17 @@ def actions(user=Depends(require_role("resident"))):
     df, acts, out = data(), core.load_actions(), []
     for x in acts.itertuples():
         b, a, n = core.review_action(df, x.appliance, x.ts)
-        out.append(dict(ts=x.ts, appliance=x.appliance, note=x.note, before=b, after=a, days_after=n))
+        out.append(dict(
+            ts=x.ts,
+            appliance=x.appliance,
+            note=x.note,
+            action_id=x.action_id,
+            before=b,
+            after=a,
+            days_after=n,
+            estimated_kwh=x.estimated_kwh,
+            estimated_rm=x.estimated_rm,
+        ))
     return clean(out)
 
 

@@ -99,6 +99,11 @@ def signup(account: Signup, response: Response):
     return {"user": user}
 
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
 @app.post("/api/auth/login")
 def login(credentials: Login, response: Response):
     user = auth.authenticate(credentials.email.strip(), credentials.password)
@@ -350,21 +355,24 @@ def actions(user=Depends(require_role("resident"))):
 
 
 class Q(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=1000)
 
 
 @app.post("/api/chat")
 def chat(q: Q, user=Depends(require_role("resident"))):
+    question = q.question.strip()
+    if not question:
+        raise HTTPException(400, "Enter a question")
     df = data()
     if not GEMINI_API_KEY:
-        ans = core.fallback_answer(df, None, q.question)
+        ans = core.fallback_answer(df, None, question)
         ans += "\n\n_Gemini key is not set; showing rule-based advice instead._"
     else:
         try:
-            ans = core.ask_gemini(q.question[:1000], core.build_context(df), GEMINI_API_KEY)
+            ans = core.ask_gemini(question, core.build_context(df), GEMINI_API_KEY)
         except Exception:
             logger.exception("Gemini chat request failed; using rule-based fallback")
-            ans = core.fallback_answer(df, None, q.question)
+            ans = core.fallback_answer(df, None, question)
             ans += "\n\n_Gemini request failed; showing rule-based advice instead. Check the Uvicorn terminal for the error._"
     return {"answer": ans}
 

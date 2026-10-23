@@ -1,14 +1,23 @@
 # EcoWatt AI
 
+## Run locally
+
     pip install -r requirements.txt
-    $env:GEMINI_API_KEY = Read-Host "Enter your Gemini API key"
     python -m uvicorn server:app --reload
-    if cannot
-    python -m uvicorn server:app --reload --host 127.0.0.1 --port 8001(try use other port)
-    http://127.0.0.1:8001/
+    http://127.0.0.1:8000/
 
+The Gemini API key is optional for local development; without it, the advisor uses built-in rules. To use Gemini locally, set `GEMINI_API_KEY` in the same terminal before starting Uvicorn. Never put the key in source code or browser JavaScript.
 
-The API key is optional. Without it, the built-in rules answer. In PowerShell, set the environment variable in the same terminal before starting Uvicorn.
+## Publish for the hackathon (Render)
+
+1. Push this repository to GitHub.
+2. In Render, choose **New → Blueprint**, connect the repository, and deploy the `render.yaml` blueprint.
+3. When prompted, enter your Gemini API key for the secret `GEMINI_API_KEY` environment variable in Render. Do not commit it or send it in chat.
+4. Wait for the deployment health check to pass, then open the Render URL. Create a resident account to explore the dashboard and AI advisor.
+
+The blueprint runs the FastAPI app and dashboard together, enables secure cookies for HTTPS, and stores the SQLite database on a persistent disk so accounts and saved actions survive restarts. The persistent disk requires a paid Render web-service plan. Check Render's current pricing before deploying. The advisor has a rule-based fallback if no key is configured or Gemini is unavailable; its response will say when it is using fallback advice.
+
+The demo's energy readings are simulated and shared across accounts on the same deployment. Ask judges to create their own account; do not share a personal account or use real household data. A public URL with an AI key can incur API usage, so set a suitable quota/budget in Google AI Studio and monitor it during judging.
 
 The app provides resident sign-up and sign-in. Accounts and hashed passwords are stored in `ecowatt.db`; browser sessions use an HTTP-only cookie and expire after seven days. Passwords must be at least 12 characters.
 
@@ -25,7 +34,7 @@ Google sign-in is also supported. Create a Google OAuth 2.0 **Web application** 
 
 The client ID is public configuration, not a password. Google sign-in is hidden as unavailable until it is configured. The server verifies Google's ID token and requires a verified email before creating or linking a resident account. Existing accounts can be linked by the same verified Google email.
 
-For a deployment over HTTPS, set `$env:COOKIE_SECURE = "1"` before starting Uvicorn. Do not expose this demo publicly without adding appropriate rate limiting and separate storage/access controls for real household data.
+For a self-managed deployment over HTTPS, set `COOKIE_SECURE=1`. Do not use the demo for real household data without adding appropriate rate limiting and separate storage/access controls.
 
 The dashboard includes the Eco Score overview, detailed/simple view toggle, interactive home map, appliance action log, budget and challenges, shareable weekly recap, hourly scheduler, month comparison, device readings, dark mode, and energy tips. To enable sensor reading ingestion, set a private token in the same PowerShell window before starting Uvicorn:
 

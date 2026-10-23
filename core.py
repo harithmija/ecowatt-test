@@ -6,7 +6,7 @@ import tariff as T
 from config import GRID_KG_PER_KWH
 import pandas as pd
 
-DB = os.path.join(os.path.dirname(__file__), "ecowatt.db")
+DB = os.getenv("ECOWATT_DB_PATH", os.path.join(os.path.dirname(__file__), "ecowatt.db"))
 
 APPLIANCES = {  # id: (name, rated watts, room)
     1: ("Air conditioner", 1500, "Bedroom"),

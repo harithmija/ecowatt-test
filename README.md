@@ -12,9 +12,12 @@ The Gemini API key is optional for local development; without it, the advisor us
 
 1. Push this repository to GitHub.
 2. Open [Render Blueprints](https://dashboard.render.com/blueprints), connect the repository, and deploy the `render.yaml` Blueprint.
-3. Wait for the health check to pass, then open the Render URL and create a resident account. The advisor uses built-in rule-based responses unless an optional Gemini API key is configured privately in Render.
+3. During setup, enter your Gemini API key directly in Render's `GEMINI_API_KEY` secret field. Never commit the key or send it in chat.
+4. Wait for the health check to pass, then open the Render URL and create a resident account.
 
-The Blueprint runs the FastAPI app and dashboard together and enables secure cookies over HTTPS. Free Render services can spin down when idle and take about a minute to wake up. Their filesystem is temporary, so SQLite accounts, sessions, actions, and sensor readings can be lost on restart, spin-down, or redeploy; simulated readings are recreated when the service starts. This setup is for trying the demo, not persistent household data or production use. Do not commit API keys or ingestion tokens. The demo's simulated readings are shared across accounts on the same deployment; ask viewers to create their own accounts rather than sharing yours.
+The Blueprint runs the FastAPI app and dashboard together on Render's free web-service plan and enables secure cookies over HTTPS. Free services sleep after 15 minutes without traffic and can take about a minute to wake up. Their filesystem is temporary, so SQLite accounts, sessions, saved actions, and settings can be lost on sleep, restart, or redeploy. Simulated readings are recreated at startup. This setup is for trying the demo, not persistent household data or production use. For persistent SQLite data, use a paid service with a disk mounted at `/var/data` and set `ECOWATT_DB_PATH=/var/data/ecowatt.db`.
+
+The advisor uses built-in rules if no Gemini key is configured or Gemini is unavailable; the response indicates when it is using fallback advice. Gemini API free-tier model availability and quotas depend on the model and Google AI Studio project limits. Check the current quota before sharing the demo. Readings are simulated and shared across accounts; ask judges to create their own accounts rather than sharing yours.
 
 The app provides resident sign-up and sign-in. Accounts and hashed passwords are stored in `ecowatt.db`; browser sessions use an HTTP-only cookie and expire after seven days. Passwords must be at least 12 characters.
 

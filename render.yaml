@@ -7,5 +7,9 @@ services:
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
+      - key: ECOWATT_DB_PATH
+        value: /tmp/ecowatt.db
       - key: COOKIE_SECURE
         value: "1"
+      - key: GEMINI_API_KEY
+        sync: false

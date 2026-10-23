@@ -314,16 +314,19 @@ def ask_gemini(question, context, api_key):
 
     client = genai.Client(
         api_key=api_key,
-        http_options=types.HttpOptions(timeout=60000),
+        http_options=types.HttpOptions(timeout=30000),
     )
-    r = client.interactions.create(
-        model="gemini-3.8-flash",
-        input=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}",
-        generation_config={"thinking_level": "low"},
+    r = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=f"{SYSTEM}\n\nDATA:\n{context}\n\nRESIDENT QUESTION: {question}",
+        config=types.GenerateContentConfig(
+            max_output_tokens=512,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
     )
-    if not r.output_text:
+    if not r.text:
         raise RuntimeError("Gemini returned no text response.")
-    return r.output_text
+    return r.text
 
 
 def fallback_answer(df, tariff=None, question=""):

@@ -21,14 +21,6 @@ def _kwh_for(rm):
     return lo
 
 
-def _scheduler_category(appliance):
-    if appliance.lower().endswith(" lights"):
-        return "Lights"
-    if appliance.lower().endswith(" fan"):
-        return "Fans"
-    return appliance
-
-
 def _score(df, last, proj, st, budget):
     pace = core.bill(proj) / budget
     b = max(0, min(100, 100 - (pace - .8) * 250))
@@ -56,7 +48,7 @@ def _scheduler_plan(df):
     last = pd.Timestamp(df.date.max()).normalize()
     history_start = last - pd.Timedelta(days=55)
     history = df[df.date >= history_start].copy()
-    history["appliance"] = history.appliance.map(_scheduler_category)
+    history["appliance"] = history.appliance.map(core.appliance_category)
     history = history.groupby(["date", "hour", "appliance"], as_index=False).agg(
         kwh=("kwh", "sum"),
         source=("source", lambda sources: "simulated" if (sources == "simulated").all() else "sensor"),

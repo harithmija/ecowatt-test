@@ -23,6 +23,15 @@ APPLIANCES = {  # id: (name, rated watts, room)
     12: ("Laundry lights", 20, "Laundry"),
 }
 
+
+def appliance_category(name):
+    if name.lower().endswith(" lights"):
+        return "Lights"
+    if name.lower().endswith(" fan"):
+        return "Fans"
+    return name
+
+
 DEFAULT_TARIFF = None  # tariff now lives in tariff.py
 
 RECS = {

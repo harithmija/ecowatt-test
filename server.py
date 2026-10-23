@@ -201,7 +201,11 @@ def ctx():
 def overview(user=Depends(require_role("resident"))):
     df, last, cur, proj, st = ctx()
     fl = st[st.status.isin(["abnormal", "high"])].sort_values("extra_month_rm", ascending=False)
-    t30 = df[df.date > last - pd.Timedelta(days=30)].groupby(["date", "appliance"]).kwh.sum().unstack().fillna(0)
+    current_categories = cur.assign(category=cur.appliance.map(core.appliance_category))
+    trend_data = df[df.date > last - pd.Timedelta(days=30)].assign(
+        category=lambda readings: readings.appliance.map(core.appliance_category)
+    )
+    t30 = trend_data.groupby(["date", "category"]).kwh.sum().unstack().fillna(0)
     action_cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=7)
     action_impacts = []
     for action in core.load_actions().itertuples():
@@ -243,7 +247,7 @@ def overview(user=Depends(require_role("resident"))):
         month=last.strftime("%B %Y"), day=last.day, days=last.days_in_month,
         kwh=cur.kwh.sum(), bill=core.bill(cur.kwh.sum()), proj_kwh=proj, proj_bill=core.bill(proj),
         savings=fl.extra_month_rm.sum(), simulated=bool((df.source == "simulated").all()),
-        by_appliance=cur.groupby("appliance").kwh.sum().to_dict(),
+        by_appliance=current_categories.groupby("category").kwh.sum().to_dict(),
         trend=dict(dates=list(t30.index), series={c: list(t30[c]) for c in t30}),
         action_impacts=action_impacts,
         alerts=[dict(appliance=r.appliance, status=r.status, why=r.why, rec=core.RECS[r.appliance], rm=r.extra_month_rm) for r in fl.itertuples()]))
@@ -260,11 +264,7 @@ def monthly(month: str, user=Depends(require_role("resident"))):
     d = df[df.date.dt.strftime("%Y-%m") == month]
     if d.empty:
         raise HTTPException(404, "No data for that month")
-    report = d.assign(category=d.appliance.map(
-        lambda name: "Lights" if name.lower().endswith("lights")
-        else "Fans" if name.lower().endswith("fan")
-        else name
-    ))
+    report = d.assign(category=d.appliance.map(core.appliance_category))
     daily = report.groupby(["date", "category"]).kwh.sum().unstack().fillna(0)
     dd = daily.sum(axis=1)
     hm = d.groupby(["hour", "date"]).kwh.sum().unstack().fillna(0)

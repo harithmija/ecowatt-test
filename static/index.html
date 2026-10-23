@@ -716,10 +716,10 @@
                 const appVals = Object.values(data.by_appliance);
                 if(charts.donut) charts.donut.destroy();
                 charts.donut = new ApexCharts(document.querySelector("#chart-donut"), {
-                    series: appVals.map(v => Math.round(v)),
+                    series: appVals.map(Number),
                     labels: appNames,
                     chart: { type: 'donut', height: 300, fontFamily: 'Plus Jakarta Sans' },
-                    colors: appNames.map(n => APP_COLORS[n] || '#94a3b8'),
+                    colors: appNames.map(n => REPORT_COLORS[n] || APP_COLORS[n] || '#94a3b8'),
                     stroke: { width: 0 }, dataLabels: { enabled: false },
                     plotOptions: { pie: { donut: { size: '65%' } } }, legend: { position: 'bottom' }
                 });
@@ -733,7 +733,7 @@
                 charts.area = new ApexCharts(document.querySelector("#chart-area"), {
                     series: areaSeries,
                     chart: { type: 'area', height: 300, stacked: true, toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
-                    colors: Object.keys(data.trend.series).map(n => APP_COLORS[n] || '#94a3b8'),
+                    colors: Object.keys(data.trend.series).map(n => REPORT_COLORS[n] || APP_COLORS[n] || '#94a3b8'),
                     dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 2 },
                     fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.1, stops: [0, 90, 100] } },
                     xaxis: { categories: data.trend.dates, type: 'datetime', labels: { format: 'dd MMM' } },
